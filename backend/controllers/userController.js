@@ -1,6 +1,6 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
-const { getUserByUsername } = require('../models/sqlQueries');
+const { getUserByUsername, insertUser } = require('../models/sqlQueries');
 
 // 登录用户
 async function loginUser(req, res) {
@@ -39,4 +39,33 @@ async function loginUser(req, res) {
     }
 }
 
-module.exports = { loginUser };
+// 注册用户
+async function registerUser(req, res) {
+    const { username, password } = req.body;
+
+    try {
+        const pool = await sql.connect();
+
+        // 检查用户是否已存在
+        const existingUserResult = await pool.request()
+            .input('username', sql.NVarChar, username)
+            .query(getUserByUsername);
+
+        if (existingUserResult.recordset.length > 0) {
+            return res.status(400).json({ message: '用户名已存在' });
+        }
+
+        // 插入新用户（密码以明文存储）
+        await pool.request()
+            .input('username', sql.NVarChar, username)
+            .input('password', sql.NVarChar, password) // 明文密码
+            .query(insertUser);
+
+        res.status(201).json({ message: '注册成功' });
+    } catch (error) {
+        console.error('Register error:', error);
+        res.status(500).json({ message: '服务器错误' });
+    }
+}
+
+module.exports = { loginUser, registerUser };

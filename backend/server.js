@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 require('dotenv').config();
 
-const { loginUser } = require('./controllers/userController');
+const { loginUser, registerUser } = require('./controllers/userController');
 const { getDishes, addDish, deleteDish, updateDish  } = require('./controllers/dishController'); // 确保导入所有需要的函数
 const { placeOrder, getUserOrders, deleteOrder } = require('./controllers/orderController');
 const { authMiddleware } = require('./middlewares/authMiddleware');
@@ -42,6 +42,9 @@ app.get('/', (req, res) => {
 
 // 用户登录 API
 app.post('/api/login', loginUser);
+
+// 用户注册 API
+app.post('/api/register', registerUser);
 
 // 获取所有菜品 API
 app.get('/api/dishes', getDishes);

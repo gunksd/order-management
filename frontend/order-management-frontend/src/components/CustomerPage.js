@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 function CustomerPage() {
   const [dishes, setDishes] = useState([]);
@@ -7,17 +8,18 @@ function CustomerPage() {
   const [previousOrders, setPreviousOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate(); // 使用 useNavigate 进行导航
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       alert('请先登录');
-      window.location.href = '/login';
+      navigate('/login'); // 使用 useNavigate 重定向到登录页面
       return;
     }
     fetchDishes();
     fetchPreviousOrders(token);
-  }, []);
+  }, [navigate]);
 
   const fetchDishes = () => {
     axios.get('http://localhost:5000/api/dishes')
@@ -67,7 +69,7 @@ function CustomerPage() {
 
     if (!userId) {
       alert('用户 ID 不存在，请重新登录');
-      window.location.href = '/login';
+      navigate('/login'); // 使用 useNavigate 重定向到登录页面
       return;
     }
 

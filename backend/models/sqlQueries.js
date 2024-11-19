@@ -63,8 +63,14 @@ const deleteOrderDetailsQuery = `
     WHERE order_id = @order_id;
 `;
 
+const insertUser = `
+    INSERT INTO [user] (username, password, user_type)
+    VALUES (@username, @password, '顾客')
+`;
+
 module.exports = {
     getUserByUsername,
+    insertUser,
     getAllDishes,
     insertDish,
     deleteDishQuery,

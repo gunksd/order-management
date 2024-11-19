@@ -1,70 +1,59 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa'; // 引入眼睛图标
 
-function Login({ onLogin }) {
+function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // 添加状态来控制密码显示
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate(); // 使用 useNavigate 来进行导航
+  const [success, setSuccess] = useState(null);
+  const navigate = useNavigate(); // 使用 React Router 提供的 useNavigate 钩子
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
+    if (password !== confirmPassword) {
+      setError('两次输入的密码不一致');
+      return;
+    }
+
     try {
-      const response = await axios.post('http://localhost:5000/api/login', {
+      const response = await axios.post('http://localhost:5000/api/register', {
         username,
         password,
       });
 
-      const { token, role, userId } = response.data;
-
-      // 存储 token 和 userId 到本地存储，用于后续 API 调用
-      localStorage.setItem('token', token);
-      localStorage.setItem('userId', userId);
-
-      // 触发父组件的回调，传递用户角色
-      onLogin(role);
-
-      // 根据角色导航到不同的页面，例如：
-      if (role === '顾客') {
-        navigate('/customer'); // 导航到顾客页面
-      } else if (role === '管理员') {
-        navigate('/admin'); // 导航到管理员页面
+      if (response.status === 201) {
+        setSuccess('注册成功，请登录');
+        setError(null);
+        setTimeout(() => navigate('/'), 2000); // 延迟一会儿然后导航回登录页面
       }
     } catch (error) {
-      setError('登录失败，请检查用户名或密码');
-      console.error('Login error:', error);
-    }
-  };
-
-  // 处理按键事件
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleLogin();
+      setError('注册失败，请重试');
+      console.error('Register error:', error);
     }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.header}>智能点菜系统登录</h2>
+        <h2 style={styles.header}>注册</h2>
         <input
           type="text"
           placeholder="用户名"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           style={styles.input}
-          onKeyDown={handleKeyDown} // 绑定按键事件
         />
         <div style={styles.passwordContainer}>
           <input
-            type={showPassword ? 'text' : 'password'} // 根据 showPassword 的值切换输入框类型
+            type={showPassword ? 'text' : 'password'}
             placeholder="密码"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={styles.passwordInput}
-            onKeyDown={handleKeyDown} // 绑定按键事件
           />
           <div
             onClick={() => setShowPassword(!showPassword)}
@@ -73,16 +62,26 @@ function Login({ onLogin }) {
             {showPassword ? <FaEyeSlash /> : <FaEye />}
           </div>
         </div>
-        <button onClick={handleLogin} style={styles.button}>
-          登录
+        <div style={styles.passwordContainer}>
+          <input
+            type={showConfirmPassword ? 'text' : 'password'}
+            placeholder="确认密码"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            style={styles.passwordInput}
+          />
+          <div
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            style={styles.showPasswordButton}
+          >
+            {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+          </div>
+        </div>
+        <button onClick={handleRegister} style={styles.button}>
+          注册
         </button>
         {error && <div style={styles.error}>{error}</div>}
-        <div style={styles.registerLink}>
-          <span>还没有账号？</span>
-          <Link to="/register" style={styles.registerButton}>
-            注册
-          </Link>
-        </div>
+        {success && <div style={styles.success}>{success}</div>}
       </div>
     </div>
   );
@@ -144,7 +143,7 @@ const styles = {
     alignItems: 'center',
   },
   button: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#28a745',
     color: '#fff',
     border: 'none',
     padding: '10px 20px',
@@ -158,17 +157,10 @@ const styles = {
     color: 'red',
     marginTop: '10px',
   },
-  registerLink: {
-    marginTop: '20px',
-  },
-  registerButton: {
-    marginLeft: '10px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: '#007bff',
-    cursor: 'pointer',
-    textDecoration: 'underline',
+  success: {
+    color: 'green',
+    marginTop: '10px',
   },
 };
 
-export default Login;
+export default Register;
