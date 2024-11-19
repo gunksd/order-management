@@ -37,7 +37,7 @@ function Login({ onLogin }) {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.header}>登录</h2>
+        <h2 style={styles.header}>智能点菜系统登录</h2>
         <input
           type="text"
           placeholder="用户名"
