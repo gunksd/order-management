@@ -52,8 +52,14 @@ const getOrderById = `
 `;
 
 // 删除订单
-const deleteOrderById = `
-    DELETE FROM [order]
+const deleteOrderQuery = `
+    DELETE FROM [order] 
+    WHERE order_id = @order_id;
+`;
+
+// 删除订单详情（以确保正确删除订单的详细信息）
+const deleteOrderDetailsQuery = `
+    DELETE FROM order_details 
     WHERE order_id = @order_id;
 `;
 
@@ -61,11 +67,12 @@ module.exports = {
     getUserByUsername,
     getAllDishes,
     insertDish,
-    deleteDishQuery, // 新增删除菜品的 SQL 语句
-    updateDishQuery, // 包括更新菜品的 SQL 语句
+    deleteDishQuery,
+    updateDishQuery,
     insertOrder,
     insertOrderDetails,
     getOrdersByUserId,
     getOrderById,
-    deleteOrderById
+    deleteOrderQuery,
+    deleteOrderDetailsQuery
 };

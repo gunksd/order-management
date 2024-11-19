@@ -7,8 +7,8 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { loginUser } = require('./controllers/userController');
-const { getDishes, addDish, deleteDish, updateDish } = require('./controllers/dishController'); // 确保导入所有需要的函数
-const { placeOrder, getUserOrders } = require('./controllers/orderController');
+const { getDishes, addDish, deleteDish, updateDish  } = require('./controllers/dishController'); // 确保导入所有需要的函数
+const { placeOrder, getUserOrders, deleteOrder } = require('./controllers/orderController');
 const { authMiddleware } = require('./middlewares/authMiddleware');
 
 // 创建 Express 应用实例
@@ -55,11 +55,18 @@ app.delete('/api/dishes/:dishId', authMiddleware(['管理员']), deleteDish);
 // 更新菜品（仅限管理员）
 app.put('/api/dishes/:dishId', authMiddleware(['管理员']), updateDish);
 
+// 获取用户的订单 API（仅限顾客）
+app.get('/api/orders', authMiddleware(['顾客']), (req, res, next) => {
+  console.log('GET /api/orders route hit');
+  next();
+}, getUserOrders);
+
+// 删除订单 API（仅限顾客）
+app.delete('/api/orders/:orderId', authMiddleware(['顾客', '管理员']), deleteOrder);
+
+
 // 提交订单 API（仅限顾客）
 app.post('/api/orders', authMiddleware(['顾客']), placeOrder);
-
-// 获取用户的订单 API（仅限顾客）
-app.get('/api/orders', authMiddleware(['顾客']), getUserOrders);
 
 // 未匹配路由的错误处理
 app.use((req, res, next) => {

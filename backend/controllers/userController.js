@@ -31,7 +31,8 @@ async function loginUser(req, res) {
             { expiresIn: '1h' }
         );
 
-        res.json({ token, role: user.user_type });
+        // 返回 token, role, 和 userId
+        res.json({ token, role: user.user_type, userId: user.user_id });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ message: '服务器错误' });
