@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import Login from './Login';
-import CustomerPage from './CustomerPage';
-import AdminPage from './AdminPage';
+import Login from './components/Login';
+import CustomerPage from './components/CustomerPage';
+import AdminPage from './components/AdminPage';
 
 function App() {
   const [role, setRole] = useState(null);

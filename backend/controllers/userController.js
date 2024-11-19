@@ -1,5 +1,4 @@
 const sql = require('mssql');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { getUserByUsername } = require('../models/sqlQueries');
 
@@ -13,16 +12,19 @@ async function loginUser(req, res) {
             .input('username', sql.NVarChar, username)
             .query(getUserByUsername);
 
+        // 检查用户是否存在
         if (result.recordset.length === 0) {
             return res.status(404).json({ message: '用户不存在' });
         }
 
         const user = result.recordset[0];
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (!passwordMatch) {
+
+        // 明文密码比较
+        if (password !== user.password) {
             return res.status(401).json({ message: '密码错误' });
         }
 
+        // 创建 JWT token
         const token = jwt.sign(
             { userId: user.user_id, role: user.user_type },
             process.env.JWT_SECRET,

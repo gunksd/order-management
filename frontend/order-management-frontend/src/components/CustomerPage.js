@@ -15,18 +15,29 @@ function CustomerPage() {
       });
   }, []);
 
+  // 添加到订单的方法
   const addToOrder = (dish) => {
-    setOrder([...order, dish]);
+    setOrder([...order, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1 }]);
   };
 
+  // 计算总金额
   const calculateTotal = () => {
-    return order.reduce((total, dish) => total + dish.price, 0).toFixed(2);
+    return order.reduce((total, dish) => total + dish.price * dish.quantity, 0).toFixed(2);
   };
 
+  // 提交订单的方法
   const placeOrder = () => {
     const token = localStorage.getItem('token');
+    
+    // 生成 order_items 数组，包含每个菜品的 dish_id 和 quantity
+    const orderItems = order.map(dish => ({
+      dish_id: dish.dish_id,
+      quantity: dish.quantity,
+    }));
+
     axios.post('http://localhost:5000/api/orders', {
       user_id: 1, // 假设已登录顾客ID为1
+      order_items: orderItems, // 提交的订单项
       total_amount: calculateTotal(),
     }, {
       headers: {
@@ -58,7 +69,9 @@ function CustomerPage() {
           <h2>我的订单</h2>
           <ul>
             {order.map((dish, index) => (
-              <li key={index}>{dish.dish_name} - ¥{dish.price}</li>
+              <li key={index}>
+                {dish.dish_name} - ¥{dish.price} x {dish.quantity}
+              </li>
             ))}
           </ul>
           <h3>总金额: ¥{calculateTotal()}</h3>
