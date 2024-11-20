@@ -10,6 +10,9 @@ function CustomerPage() {
   const [error, setError] = useState(null);
   const navigate = useNavigate(); // 使用 useNavigate 进行导航
 
+   // 从 localStorage 中获取用户名
+   const username = localStorage.getItem('username');
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -122,7 +125,7 @@ function CustomerPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.header}>欢迎，顾客</h1>
+        <h1 style={styles.header}>欢迎使用点菜系统，{username || '顾客'}</h1>
 
         <div style={styles.section}>
           <h2 style={styles.subHeader}>菜品列表</h2>
@@ -161,14 +164,22 @@ function CustomerPage() {
           ) : previousOrders.length === 0 ? (
             <div>历史订单为空</div>
           ) : (
-            <ul>
-              {previousOrders.map((order) => (
+          <ul>
+            {previousOrders.map((order) => {
+              const formattedTime = order.created_at
+                .replace('T', ' ')
+                .replace('Z', '')
+                .replace(/-/g, '年')
+                .replace(/(\d{4}年\d{2})/, '$1月')
+                .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})\.\d+/, '$1日 $2时$3分$4秒'); // 去掉毫秒部分
+              return (
                 <li key={order.order_id}>
-                  订单号: {order.order_id}, 金额: ¥{order.total_amount}, 创建时间: {order.created_at}
+                  订单号: {order.order_id}, 金额: ¥{order.total_amount}, 创建时间: {formattedTime}
                   <button onClick={() => deleteOrder(order.order_id)} style={{ ...styles.button, marginLeft: '10px' }}>删除订单</button>
                 </li>
-              ))}
-            </ul>
+              );
+            })}
+          </ul>
           )}
         </div>
       </div>

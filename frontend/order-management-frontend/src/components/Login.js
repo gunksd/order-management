@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { FaEye, FaEyeSlash } from 'react-icons/fa'; // 引入眼睛图标
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // 添加状态来控制密码显示
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate(); // 使用 useNavigate 来进行导航
+  const navigate = useNavigate();
 
   const handleLogin = async () => {
     try {
@@ -19,18 +19,15 @@ function Login({ onLogin }) {
 
       const { token, role, userId } = response.data;
 
-      // 存储 token 和 userId 到本地存储，用于后续 API 调用
       localStorage.setItem('token', token);
       localStorage.setItem('userId', userId);
-
-      // 触发父组件的回调，传递用户角色
+      localStorage.setItem('username', username);
       onLogin(role);
 
-      // 根据角色导航到不同的页面，例如：
       if (role === '顾客') {
-        navigate('/customer'); // 导航到顾客页面
+        navigate('/customer');
       } else if (role === '管理员') {
-        navigate('/admin'); // 导航到管理员页面
+        navigate('/admin');
       }
     } catch (error) {
       setError('登录失败，请检查用户名或密码');
@@ -38,7 +35,6 @@ function Login({ onLogin }) {
     }
   };
 
-  // 处理按键事件
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       handleLogin();
@@ -55,16 +51,16 @@ function Login({ onLogin }) {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           style={styles.input}
-          onKeyDown={handleKeyDown} // 绑定按键事件
+          onKeyDown={handleKeyDown}
         />
         <div style={styles.passwordContainer}>
           <input
-            type={showPassword ? 'text' : 'password'} // 根据 showPassword 的值切换输入框类型
+            type={showPassword ? 'text' : 'password'}
             placeholder="密码"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={styles.passwordInput}
-            onKeyDown={handleKeyDown} // 绑定按键事件
+            onKeyDown={handleKeyDown}
           />
           <div
             onClick={() => setShowPassword(!showPassword)}
@@ -80,7 +76,7 @@ function Login({ onLogin }) {
         <div style={styles.registerLink}>
           <span>还没有账号？</span>
           <Link to="/register" style={styles.registerButton}>
-            注册
+            <button style={styles.registerStyledButton}>注册</button>
           </Link>
         </div>
       </div>
@@ -95,51 +91,58 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    backgroundColor: '#f0f2f5',
+    backgroundColor: '#f7f9fc',
     padding: '20px',
+    fontFamily: "'Roboto', sans-serif",
   },
   card: {
     backgroundColor: '#fff',
-    padding: '30px',
+    padding: '40px',
     borderRadius: '15px',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
     maxWidth: '400px',
     width: '100%',
     textAlign: 'center',
     position: 'relative',
   },
   header: {
-    marginBottom: '20px',
+    marginBottom: '30px',
     color: '#333',
+    fontSize: '24px',
+    fontWeight: '600',
   },
   input: {
-    marginBottom: '10px',
-    padding: '10px',
+    marginBottom: '15px',
+    padding: '12px',
     width: '100%',
-    borderRadius: '5px',
-    border: '1px solid #ccc',
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    fontSize: '16px',
+    fontFamily: "'Roboto', sans-serif",
   },
   passwordContainer: {
     position: 'relative',
-    marginBottom: '10px',
+    marginBottom: '15px',
     width: '100%',
   },
   passwordInput: {
-    padding: '10px',
+    padding: '12px',
     width: '100%',
-    borderRadius: '5px',
-    border: '1px solid #ccc',
-    paddingRight: '40px', // 留出空间给眼睛图标按钮
+    borderRadius: '8px',
+    border: '1px solid #ddd',
+    fontSize: '16px',
+    paddingRight: '50px',
+    fontFamily: "'Roboto', sans-serif",
   },
   showPasswordButton: {
     position: 'absolute',
-    right: '10px',
+    right: '15px',
     top: '50%',
     transform: 'translateY(-50%)',
     cursor: 'pointer',
     color: '#007bff',
     fontSize: '20px',
-    userSelect: 'none', // 禁止选择文本，防止意外行为
+    userSelect: 'none',
     display: 'flex',
     alignItems: 'center',
   },
@@ -147,27 +150,44 @@ const styles = {
     backgroundColor: '#007bff',
     color: '#fff',
     border: 'none',
-    padding: '10px 20px',
-    borderRadius: '5px',
+    padding: '12px 25px',
+    borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
+    fontSize: '16px',
+    fontWeight: '500',
     outline: 'none',
-    marginTop: '10px',
+    marginTop: '20px',
+  },
+  buttonHover: {
+    backgroundColor: '#0056b3',
   },
   error: {
     color: 'red',
-    marginTop: '10px',
+    marginTop: '15px',
+    fontSize: '14px',
   },
   registerLink: {
-    marginTop: '20px',
+    marginTop: '25px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   registerButton: {
     marginLeft: '10px',
-    backgroundColor: 'transparent',
+    textDecoration: 'none',
+  },
+  registerStyledButton: {
+    backgroundColor: '#28a745',
+    color: '#fff',
     border: 'none',
-    color: '#007bff',
+    padding: '10px 20px',
+    borderRadius: '8px',
     cursor: 'pointer',
-    textDecoration: 'underline',
+    transition: 'all 0.3s ease',
+    fontSize: '14px',
+    fontWeight: '500',
+    outline: 'none',
   },
 };
 
