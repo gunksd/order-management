@@ -10,8 +10,8 @@ function CustomerPage() {
   const [error, setError] = useState(null);
   const navigate = useNavigate(); // 使用 useNavigate 进行导航
 
-   // 从 localStorage 中获取用户名
-   const username = localStorage.getItem('username');
+  // 从 localStorage 中获取用户名
+  const username = localStorage.getItem('username');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -90,9 +90,14 @@ function CustomerPage() {
         Authorization: `Bearer ${token}`,
       },
     }).then(response => {
-      alert('订单提交成功！');
-      setOrder([]);
-      fetchPreviousOrders(token);
+      const { orderId } = response.data;
+
+      if (orderId) {
+        // 跳转到支付页面
+        navigate(`/payment/${orderId}`);
+      } else {
+        alert('订单提交失败，请稍后重试。');
+      }
     }).catch(error => {
       console.error('Error placing order:', error);
       alert('订单提交失败！');
@@ -164,22 +169,23 @@ function CustomerPage() {
           ) : previousOrders.length === 0 ? (
             <div>历史订单为空</div>
           ) : (
-          <ul>
-            {previousOrders.map((order) => {
-              const formattedTime = order.created_at
-                .replace('T', ' ')
-                .replace('Z', '')
-                .replace(/-/g, '年')
-                .replace(/(\d{4}年\d{2})/, '$1月')
-                .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})\.\d+/, '$1日 $2时$3分$4秒'); // 去掉毫秒部分
-              return (
-                <li key={order.order_id}>
-                  订单号: {order.order_id}, 金额: ¥{order.total_amount}, 创建时间: {formattedTime}
-                  <button onClick={() => deleteOrder(order.order_id)} style={{ ...styles.button, marginLeft: '10px' }}>删除订单</button>
-                </li>
-              );
-            })}
-          </ul>
+            <ul>
+              {previousOrders.map((order) => {
+                const formattedTime = order.created_at
+                  .replace('T', ' ')
+                  .replace('Z', '')
+                  .replace(/\.\d+/, '') // 移除毫秒部分
+                  .replace(/-/g, '年')
+                  .replace(/(\d{4}年\d{2})/, '$1月')
+                  .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1日 $2时$3分$4秒');
+                return (
+                  <li key={order.order_id}>
+                    订单号: {order.order_id}, 金额: ¥{order.total_amount}, 创建时间: {formattedTime}
+                    <button onClick={() => deleteOrder(order.order_id)} style={{ ...styles.button, marginLeft: '10px' }}>删除订单</button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>

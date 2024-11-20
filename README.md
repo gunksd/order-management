@@ -153,13 +153,18 @@ PORT=
 ```bash
 cd backend
 ```
-2.运行后端服务器：
+2.下载依赖：
+```bash
+npm install
+```
+3.运行后端服务器：
 ```bash
 node server.js
 ```
-3.检验：</br>
+4.检验：</br>
 
 此时打开端口应当看到正常启动服务器，如若没有请根据报错信息排查。
+![alt text](frontend/order-management-frontend/public/backend.png)
 
 ### 5.前端配置：
 1.前端的`.env`文件配置：
@@ -199,6 +204,10 @@ npm install react-icons
 或者
 ```bash
 yarn add react-icons
+```
+(4).安装`react-confetti`库:</br>
+```bash
+npm install react-confetti
 ```
 3.启动前端服务：
 ```bash

@@ -42,7 +42,9 @@ const insertOrderDetails = `
 
 // 查询用户的所有订单
 const getOrdersByUserId = `
-    SELECT * FROM [order] WHERE user_id = @user_id;
+    SELECT order_id, user_id, total_amount, created_at, status 
+    FROM [order] 
+    WHERE user_id = @user_id;
 `;
 
 // 查询特定订单详细信息
@@ -68,6 +70,13 @@ const insertUser = `
     VALUES (@username, @password, '顾客')
 `;
 
+// 更新订单支付状态
+const updateOrderStatus = `
+    UPDATE [order]
+    SET status = @status, paid_at = @paid_at
+    WHERE order_id = @order_id;
+`;
+
 module.exports = {
     getUserByUsername,
     insertUser,
@@ -80,5 +89,6 @@ module.exports = {
     getOrdersByUserId,
     getOrderById,
     deleteOrderQuery,
-    deleteOrderDetailsQuery
+    deleteOrderDetailsQuery,
+    updateOrderStatus
 };

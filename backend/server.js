@@ -7,8 +7,9 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { loginUser, registerUser } = require('./controllers/userController');
-const { getDishes, addDish, deleteDish, updateDish  } = require('./controllers/dishController'); // 确保导入所有需要的函数
+const { getDishes, addDish, deleteDish, updateDish } = require('./controllers/dishController'); // 确保导入所有需要的函数
 const { placeOrder, getUserOrders, deleteOrder } = require('./controllers/orderController');
+const { generatePaymentLink, handlePaymentSuccess } = require('./controllers/paymentController');
 const { authMiddleware } = require('./middlewares/authMiddleware');
 
 // 创建 Express 应用实例
@@ -58,18 +59,68 @@ app.delete('/api/dishes/:dishId', authMiddleware(['管理员']), deleteDish);
 // 更新菜品（仅限管理员）
 app.put('/api/dishes/:dishId', authMiddleware(['管理员']), updateDish);
 
-// 获取用户的订单 API（仅限顾客）
-app.get('/api/orders', authMiddleware(['顾客']), (req, res, next) => {
-  console.log('GET /api/orders route hit');
+// 获取用户的订单 API
+app.get('/api/orders', authMiddleware(['顾客', '管理员']), (req, res, next) => {
+  console.log('Received GET request for orders from user:', req.user);
   next();
 }, getUserOrders);
 
-// 删除订单 API（仅限顾客）
+// 删除订单 API
 app.delete('/api/orders/:orderId', authMiddleware(['顾客', '管理员']), deleteOrder);
-
 
 // 提交订单 API（仅限顾客）
 app.post('/api/orders', authMiddleware(['顾客']), placeOrder);
+
+// 生成支付链接 API（仅限顾客）
+app.post('/api/payment/generate', authMiddleware(['顾客']), generatePaymentLink);
+
+// 支付成功确认 API（仅限管理员）
+// 模拟管理员手动确认支付状态
+app.post('/api/payment/confirm', authMiddleware(['管理员']), handlePaymentSuccess);
+
+// 支付成功确认 API（仅限管理员）
+// 模拟管理员手动确认支付状态
+app.post('/api/payment/confirm', authMiddleware(['管理员']), handlePaymentSuccess);
+
+// 更新订单支付状态 API（仅限管理员）
+// 用于管理员手动确认订单支付完成后，更新订单状态
+app.put('/api/orders/confirm-payment', authMiddleware(['管理员']), async (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ message: '订单 ID 无效' });
+  }
+
+  try {
+    // 连接到数据库
+    const pool = await sql.connect();
+    const request = new sql.Request(pool);
+
+    // 设定输入参数
+    request.input('order_id', sql.Int, orderId);
+    request.input('status', sql.NVarChar, 'paid');
+    request.input('paid_at', sql.DateTime, new Date()); // 更新支付时间
+
+    // 执行 SQL 更新语句
+    const result = await request.query(`
+      UPDATE [order]
+      SET status = @status, paid_at = @paid_at
+      WHERE order_id = @order_id;
+    `);
+
+    // 检查是否有受影响的行
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: '订单未找到' });
+    }
+
+    // 返回成功响应
+    res.status(200).json({ message: '订单支付状态已更新' });
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
 
 // 未匹配路由的错误处理
 app.use((req, res, next) => {

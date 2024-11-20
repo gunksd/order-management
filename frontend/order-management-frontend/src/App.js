@@ -4,6 +4,7 @@ import Login from './components/Login';
 import CustomerPage from './components/CustomerPage';
 import AdminPage from './components/AdminPage';
 import Register from './components/Register';
+import PaymentPage from './components/PaymentPage'; // 确保引入 PaymentPage 组件
 
 function App() {
   const [role, setRole] = useState(null);
@@ -25,6 +26,11 @@ function App() {
         <Route
           path="/admin"
           element={role === '管理员' ? <AdminPage /> : <Navigate to="/" />}
+        />
+        {/* 添加支付页面的路由 */}
+        <Route
+          path="/payment/:orderId"
+          element={<PaymentPage />}
         />
       </Routes>
     </Router>

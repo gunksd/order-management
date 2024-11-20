@@ -11,34 +11,120 @@ function AdminPage() {
   const [error, setError] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editDishId, setEditDishId] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [orderError, setOrderError] = useState(null);
   const [searchActive, setSearchActive] = useState(false);
   const searchButtonRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
 
   useEffect(() => {
     fetchDishes();
+    fetchOrders();
   }, []);
 
   // 获取菜品列表
   const fetchDishes = async () => {
+    const token = localStorage.getItem('token');
+    console.log('Using token to fetch dishes:', token);
     try {
       const response = await axios.get('http://localhost:5000/api/dishes', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       setDishes(response.data);
       setFilteredDishes(response.data);
       setError(null);
     } catch (error) {
-      console.error('Error fetching dishes:', error);
-      if (error.response && error.response.status === 401) {
+      handleAuthError(error, '无法获取菜品列表，请稍后重试。');
+    }
+  };
+
+  // 获取历史订单
+  const fetchOrders = async () => {
+    const token = localStorage.getItem('token');
+    console.log('Using token to fetch orders:', token);
+    try {
+      const response = await axios.get('http://localhost:5000/api/orders', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setOrders(response.data);
+      setOrderError(null);
+    } catch (error) {
+      handleAuthError(error, '无法获取订单列表，请稍后重试。');
+    }
+  };
+
+  // 处理错误和未授权跳转
+  const handleAuthError = (error, fallbackMessage) => {
+    if (error.response) {
+      console.error('Error response:', error.response);
+      if (error.response.status === 401) {
         setError('未授权访问，请重新登录。');
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);
       } else {
-        setError('无法获取菜品列表，请稍后重试。');
+        setError(fallbackMessage);
       }
+    } else if (error.request) {
+      console.error('Error request (no response received):', error.request);
+      setError('无法连接到服务器，请检查网络连接。');
+    } else {
+      console.error('Error setting up request:', error.message);
+      setError(fallbackMessage);
+    }
+  };
+
+  // 确认支付
+const handleConfirmPayment = async (orderId) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('未找到用户令牌，请重新登录。');
+    }
+
+    // 发起请求更新订单的支付状态为 "paid"
+    const response = await axios.put(
+      `http://localhost:5000/api/orders/confirm-payment`,
+      { orderId },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (response.status === 200) {
+      alert('支付状态更新成功');
+      fetchOrders(); // 更新订单列表，以显示最新状态
+    } else {
+      alert('支付状态更新失败，请稍后重试。');
+    }
+  } catch (error) {
+    console.error('Error confirming payment:', error);
+    setOrderError('支付确认失败，请稍后重试。');
+  }
+};
+
+  // 取消订单
+  const handleCancelOrder = async (orderId) => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('Using token to cancel order:', token);
+      await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      alert('订单取消成功');
+      fetchOrders();
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      setOrderError('取消订单失败，请稍后重试。');
     }
   };
 
@@ -57,6 +143,13 @@ function AdminPage() {
     }
   };
 
+  // 分页处理
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  
   // 添加菜品
   const handleAddDish = async () => {
     if (!dishName || price <= 0 || stock <= 0) {
@@ -65,6 +158,8 @@ function AdminPage() {
     }
 
     try {
+      const token = localStorage.getItem('token');
+      console.log('Using token to add dish:', token);
       await axios.post(
         'http://localhost:5000/api/dishes',
         {
@@ -74,7 +169,7 @@ function AdminPage() {
         },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -86,37 +181,25 @@ function AdminPage() {
       fetchDishes();
     } catch (error) {
       console.error('Error adding dish:', error);
-      if (error.response && error.response.status === 401) {
-        setError('未授权访问，请重新登录。');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      } else {
-        setError('添加菜品失败，请检查输入信息。');
-      }
+      handleAuthError(error, '添加菜品失败，请检查输入信息。');
     }
   };
 
   // 删除菜品
   const handleDeleteDish = async (dishId) => {
     try {
+      const token = localStorage.getItem('token');
+      console.log('Using token to delete dish:', token);
       await axios.delete(`http://localhost:5000/api/dishes/${dishId}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       alert('菜品删除成功');
       fetchDishes();
     } catch (error) {
       console.error('Error deleting dish:', error);
-      if (error.response && error.response.status === 401) {
-        setError('未授权访问，请重新登录。');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      } else {
-        setError('删除菜品失败，请稍后重试。');
-      }
+      handleAuthError(error, '删除菜品失败，请稍后重试。');
     }
   };
 
@@ -137,6 +220,8 @@ function AdminPage() {
     }
 
     try {
+      const token = localStorage.getItem('token');
+      console.log('Using token to update dish:', token);
       await axios.put(
         `http://localhost:5000/api/dishes/${editDishId}`,
         {
@@ -146,7 +231,7 @@ function AdminPage() {
         },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -160,14 +245,7 @@ function AdminPage() {
       fetchDishes();
     } catch (error) {
       console.error('Error updating dish:', error);
-      if (error.response && error.response.status === 401) {
-        setError('未授权访问，请重新登录。');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      } else {
-        setError('更新菜品失败，请检查输入信息。');
-      }
+      handleAuthError(error, '更新菜品失败，请检查输入信息。');
     }
   };
 
@@ -301,12 +379,67 @@ function AdminPage() {
             ))}
           </ul>
         </div>
+
+        <div>
+          <h3 style={styles.subHeader}>历史订单列表</h3>
+          {orderError && <div style={styles.error}>{orderError}</div>}
+          <ul style={styles.orderList}>
+            {currentOrders.map((order) => (
+              <li key={order.order_id} style={styles.orderItem}>
+                <div>
+                  订单编号: {order.order_id} - 总金额: ¥{order.total_amount} - 状态: {order.status}
+                </div>
+                <div>
+                  {order.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => handleConfirmPayment(order.order_id)}
+                        style={styles.confirmButton}
+                      >
+                        确认支付
+                      </button>
+                      <button
+                        onClick={() => handleCancelOrder(order.order_id)}
+                        style={styles.cancelButton}
+                      >
+                        取消订单
+                      </button>
+                    </>
+                  )}
+                  {order.status === 'paid' && (
+                    <button
+                      onClick={() => handleCancelOrder(order.order_id)}
+                      style={styles.cancelButton}
+                    >
+                      取消订单
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div style={styles.pagination}>
+            {Array.from({ length: Math.ceil(orders.length / ordersPerPage) }, (_, index) => (
+              <button
+                key={index + 1}
+                onClick={() => paginate(index + 1)}
+                style={
+                  currentPage === index + 1
+                    ? { ...styles.pageButton, ...styles.activePageButton }
+                    : styles.pageButton
+                }
+              >
+                {index + 1}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// 样式对象，采用黑白配色和简约风格
+// 样式对象
 const styles = {
   container: {
     display: 'flex',
@@ -321,7 +454,7 @@ const styles = {
     padding: '30px',
     borderRadius: '15px',
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
-    maxWidth: '500px',
+    maxWidth: '600px',
     width: '100%',
     textAlign: 'center',
     position: 'relative',
@@ -340,7 +473,7 @@ const styles = {
     cursor: 'move',
   },
   searchButton: {
-    backgroundColor: 'white', // 将背景颜色改为白色
+    backgroundColor: 'white',
     color: '#333',
     border: 'none',
     borderRadius: '50%',
@@ -419,6 +552,34 @@ const styles = {
     padding: '10px',
     borderBottom: '1px solid #ddd',
   },
+  orderList: {
+    listStyleType: 'none',
+    padding: '0',
+  },
+  orderItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px',
+    borderBottom: '1px solid #ddd',
+  },
+  pagination: {
+    marginTop: '20px',
+  },
+  pageButton: {
+    backgroundColor: '#fff',
+    color: '#333',
+    border: '1px solid #ccc',
+    padding: '5px 10px',
+    margin: '0 5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+  },
+  activePageButton: {
+    backgroundColor: '#007bff',
+    color: '#fff',
+  },
+
 };
 
 export default AdminPage;

@@ -1,5 +1,5 @@
 const sql = require('mssql');
-const { insertOrder, insertOrderDetails, getOrdersByUserId, deleteOrderById, getOrderById, deleteOrderQuery, deleteOrderDetailsQuery } = require('../models/sqlQueries');
+const { insertOrder, insertOrderDetails, getOrdersByUserId, deleteOrderById, getOrderById, deleteOrderQuery, deleteOrderDetailsQuery, updateOrderPaymentStatusQuery } = require('../models/sqlQueries');
 
 // 提交订单
 async function placeOrder(req, res) {
@@ -25,6 +25,7 @@ async function placeOrder(req, res) {
             const orderResult = await orderRequest
                 .input('user_id', sql.Int, user_id)
                 .input('total_amount', sql.Decimal(10, 2), total_amount)
+                .input('status', sql.NVarChar, 'pending') // 初始状态为 'pending'
                 .query(insertOrder);
 
             if (!orderResult.recordset || orderResult.recordset.length === 0) {
@@ -59,33 +60,46 @@ async function placeOrder(req, res) {
         res.status(500).json({ message: '服务器错误', error: error.message });
     }
 }
-//获取历史订单
+
+// 获取历史订单
 async function getUserOrders(req, res) {
-    const { userId } = req.user;
+    const { userId, role } = req.user; // 从解码的 Token 中获取用户 ID 和角色
 
     try {
         if (!userId) {
             return res.status(400).json({ message: '用户 ID 无效' });
         }
 
+        // 连接到数据库
         const pool = await sql.connect();
-        const result = await pool.request()
-            .input('user_id', sql.Int, userId)
-            .query(getOrdersByUserId);
-    
-        console.log('Database query result:', result.recordset);
 
-        if (result.recordset.length === 0) {
-            return res.status(404).json({ message: '未找到订单' });
+        let result;
+
+        if (role === '管理员') {
+            // 如果是管理员，则获取所有订单
+            result = await pool.request()
+                .query('SELECT * FROM [order]');
+        } else {
+            // 如果是普通用户，则只获取该用户的订单
+            result = await pool.request()
+                .input('user_id', sql.Int, userId)
+                .query(getOrdersByUserId);
         }
 
+        console.log('Database query result:', result.recordset);
+
+        // 检查查询结果是否为空
+        if (result.recordset.length === 0) {
+            return res.status(200).json([]); // 返回空数组，而不是 404 错误
+        }
+
+        // 返回查询结果
         res.json(result.recordset);
     } catch (error) {
         console.error('Error fetching orders:', error);
         res.status(500).json({ message: '服务器错误', error: error.message });
     }
 }
-
 
 // 获取特定订单的详细信息
 async function getOrderDetails(req, res) {
@@ -159,4 +173,33 @@ async function deleteOrder(req, res) {
         res.status(500).json({ message: '服务器错误' });
     }
 }
-module.exports = { placeOrder, getUserOrders, getOrderDetails, deleteOrder };
+
+// 更新订单支付状态
+async function updateOrderPaymentStatus(req, res) {
+    const { orderId } = req.body; // 支付回调中提供的 orderId
+
+    try {
+        if (!orderId) {
+            return res.status(400).json({ message: '订单 ID 无效' });
+        }
+
+        const pool = await sql.connect();
+        const updateOrderRequest = new sql.Request(pool);
+        updateOrderRequest.input('order_id', sql.Int, orderId);
+        updateOrderRequest.input('status', sql.NVarChar, 'paid');
+        updateOrderRequest.input('paid_at', sql.DateTime, new Date()); // 设置支付时间
+
+        const result = await updateOrderRequest.query(updateOrderPaymentStatusQuery);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: '未找到该订单' });
+        }
+
+        res.status(200).json({ message: '订单支付状态已更新' });
+    } catch (error) {
+        console.error('Error updating payment status:', error);
+        res.status(500).json({ message: '服务器错误', error: error.message });
+    }
+}
+
+module.exports = { placeOrder, getUserOrders, getOrderDetails, deleteOrder, updateOrderPaymentStatus };
