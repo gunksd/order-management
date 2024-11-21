@@ -228,7 +228,7 @@ function CustomerPage() {
             <ul>
               {orderSummary.map((summary, index) => (
                 <li key={index}>
-                  用户 ID: {summary.user_id}, 订单数: {summary.order_count}, 总消费: ¥{summary.total_spent}
+                  用户 ID: {summary.username}, 订单数: {summary.order_count}, 总消费: ¥{summary.total_spent}
                 </li>
               ))}
             </ul>
