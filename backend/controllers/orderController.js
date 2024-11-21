@@ -1,5 +1,5 @@
 const sql = require('mssql');
-const { insertOrder, insertOrderDetails, getOrdersByUserId, deleteOrderById, getOrderById, deleteOrderQuery, deleteOrderDetailsQuery, updateOrderPaymentStatusQuery } = require('../models/sqlQueries');
+const { insertOrder, insertOrderDetails, getOrdersByUserId, deleteOrderById, getOrderById, deleteOrderQuery, deleteOrderDetailsQuery, updateOrderPaymentStatusQuery, createOrderSummaryView, dropOrderSummaryView, getUserOrderSummary } = require('../models/sqlQueries');
 
 // 提交订单
 async function placeOrder(req, res) {
@@ -47,6 +47,22 @@ async function placeOrder(req, res) {
             // 提交事务
             await transaction.commit();
 
+            // 更新订单统计视图
+            try {
+                await pool.request().query(`
+                    IF EXISTS (SELECT * FROM sys.views WHERE name = 'OrderSummary')
+                    BEGIN
+                        EXEC('ALTER VIEW OrderSummary AS
+                        SELECT username, user_id, COUNT(order_id) AS order_count, SUM(total_amount) AS total_spent
+                        FROM [order]
+                        GROUP BY user_id;')
+                    END
+                `);
+            } catch (viewError) {
+                console.error('Error updating OrderSummary view:', viewError);
+                // 这里我们不会中断用户的订单提交，只是记录更新视图的错误
+            }
+
             // 返回成功响应
             res.status(201).json({ message: '订单已提交', orderId });
         } catch (error) {
@@ -78,7 +94,7 @@ async function getUserOrders(req, res) {
         if (role === '管理员') {
             // 如果是管理员，则获取所有订单
             result = await pool.request()
-                .query('SELECT * FROM [order]');
+                .query('SELECT * FROM [order] ORDER BY created_at DESC');
         } else {
             // 如果是普通用户，则只获取该用户的订单
             result = await pool.request()
@@ -97,6 +113,26 @@ async function getUserOrders(req, res) {
         res.json(result.recordset);
     } catch (error) {
         console.error('Error fetching orders:', error);
+        res.status(500).json({ message: '服务器错误', error: error.message });
+    }
+}
+
+// 获取订单统计信息（管理员）
+async function getOrderSummary(req, res) {
+    try {
+        // 连接到数据库
+        const pool = await sql.connect();
+
+        // 使用视图来获取用户订单统计信息
+        const result = await pool.request().query(getUserOrderSummary);
+
+        if (result.recordset.length === 0) {
+            return res.status(200).json([]);
+        }
+
+        res.json(result.recordset);
+    } catch (error) {
+        console.error('Error fetching order summary:', error);
         res.status(500).json({ message: '服务器错误', error: error.message });
     }
 }
@@ -202,4 +238,4 @@ async function updateOrderPaymentStatus(req, res) {
     }
 }
 
-module.exports = { placeOrder, getUserOrders, getOrderDetails, deleteOrder, updateOrderPaymentStatus };
+module.exports = { placeOrder, getUserOrders, getOrderDetails, deleteOrder, updateOrderPaymentStatus, getOrderSummary };

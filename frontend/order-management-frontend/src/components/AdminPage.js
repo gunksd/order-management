@@ -17,10 +17,13 @@ function AdminPage() {
   const searchButtonRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
+  const [orderSummary, setOrderSummary] = useState([]); // 新增：订单统计信息
 
   useEffect(() => {
     fetchDishes();
     fetchOrders();
+    ensureOrderSummaryView();  // 新增：确保订单概要视图被创建
+    fetchOrderSummary(); 
   }, []);
 
   // 获取菜品列表
@@ -57,6 +60,41 @@ function AdminPage() {
       handleAuthError(error, '无法获取订单列表，请稍后重试。');
     }
   };
+  // 确保用户订单概要视图存在
+  const ensureOrderSummaryView = async () => {
+    const token = localStorage.getItem('token');
+    console.log('Ensuring UserOrderSummary view:', token);
+    try {
+      await axios.post('http://localhost:5000/api/views/create', {}, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log('UserOrderSummary view created or already exists');
+    } catch (error) {
+      console.error('Error ensuring UserOrderSummary view:', error);
+      handleAuthError(error, '无法创建视图，请稍后重试。');
+    }
+  };
+
+    // 获取订单统计信息
+    const fetchOrderSummary = async () => {
+      const token = localStorage.getItem('token');
+      try {
+        console.log('Fetching order summary...'); // 添加此行
+        const response = await axios.get('http://localhost:5000/api/orders/summary', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        console.log('Order summary response:', response.data); // 添加此行
+        setOrderSummary(response.data);
+      } catch (error) {
+        console.error('Error fetching order summary:', error);
+        handleAuthError(error, '无法获取订单统计信息，请稍后重试。');
+      }
+    };
+    
 
   // 处理错误和未授权跳转
   const handleAuthError = (error, fallbackMessage) => {
@@ -248,7 +286,15 @@ const handleConfirmPayment = async (orderId) => {
       handleAuthError(error, '更新菜品失败，请检查输入信息。');
     }
   };
-
+  const summaryCards = document.querySelectorAll('.summaryListItem');
+  summaryCards.forEach(card => {
+    card.addEventListener('mouseover', () => {
+      card.style.transform = 'scale(1.02)';
+    });
+    card.addEventListener('mouseout', () => {
+      card.style.transform = 'scale(1)';
+    });
+  });
   // 鼠标拖动放大镜按钮
   useEffect(() => {
     const searchButton = searchButtonRef.current;
@@ -319,6 +365,7 @@ const handleConfirmPayment = async (orderId) => {
           </div>
         </h2>
 
+
         <div style={styles.form}>
           <h3 style={styles.subHeader}>{editMode ? '编辑菜品' : '添加新菜品'}</h3>
           <input
@@ -380,7 +427,23 @@ const handleConfirmPayment = async (orderId) => {
           </ul>
         </div>
 
-        <div>
+        <h3 style={styles.subHeader}>订单统计信息</h3>
+        {orderSummary.length === 0 ? (
+          <div style={styles.noSummary}>暂无订单统计信息</div>
+        ) : (
+          <div style={styles.summaryListContainer}>
+            {orderSummary.map((summary, index) => (
+              <div key={index} style={styles.summaryListItem} className="summaryListItem">
+                <div style={styles.summaryListContent}>
+                  <span style={styles.summaryListText}><strong>用户名:</strong> {summary.username}</span>
+                  <span style={styles.summaryListText}><strong>订单数:</strong> {summary.order_count}</span>
+                  <span style={styles.summaryListText}><strong>总消费:</strong> ¥{summary.total_spent.toFixed(2)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+                <div>
           <h3 style={styles.subHeader}>历史订单列表</h3>
           {orderError && <div style={styles.error}>{orderError}</div>}
           <ul style={styles.orderList}>
@@ -579,7 +642,47 @@ const styles = {
     backgroundColor: '#007bff',
     color: '#fff',
   },
-
+  summaryListContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+    marginTop: '20px',
+    width: '100%',
+    border: '1px solid #e0e0e0',
+    padding: '20px',
+    borderRadius: '10px',
+  },
+  summaryListItem: {
+    backgroundColor: '#f9f9f9',
+    padding: '15px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    transition: 'all 0.3s ease',
+    width: '100%',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    ':hover': {
+      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+    },
+  },
+  summaryListContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    gap: '30px',
+  },
+  summaryListText: {
+    fontSize: '16px',
+    color: '#333',
+  },
+  noSummary: {
+    fontSize: '16px',
+    color: '#888',
+    textAlign: 'center',
+    padding: '20px',
+  },
 };
 
 export default AdminPage;

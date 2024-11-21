@@ -7,8 +7,8 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { loginUser, registerUser } = require('./controllers/userController');
-const { getDishes, addDish, deleteDish, updateDish } = require('./controllers/dishController'); // 确保导入所有需要的函数
-const { placeOrder, getUserOrders, deleteOrder } = require('./controllers/orderController');
+const { getDishes, addDish, deleteDish, updateDish } = require('./controllers/dishController');
+const { placeOrder, getUserOrders, deleteOrder, getOrderSummary } = require('./controllers/orderController');
 const { generatePaymentLink, handlePaymentSuccess } = require('./controllers/paymentController');
 const { authMiddleware } = require('./middlewares/authMiddleware');
 
@@ -60,10 +60,7 @@ app.delete('/api/dishes/:dishId', authMiddleware(['管理员']), deleteDish);
 app.put('/api/dishes/:dishId', authMiddleware(['管理员']), updateDish);
 
 // 获取用户的订单 API
-app.get('/api/orders', authMiddleware(['顾客', '管理员']), (req, res, next) => {
-  console.log('Received GET request for orders from user:', req.user);
-  next();
-}, getUserOrders);
+app.get('/api/orders', authMiddleware(['顾客', '管理员']), getUserOrders);
 
 // 删除订单 API
 app.delete('/api/orders/:orderId', authMiddleware(['顾客', '管理员']), deleteOrder);
@@ -75,15 +72,9 @@ app.post('/api/orders', authMiddleware(['顾客']), placeOrder);
 app.post('/api/payment/generate', authMiddleware(['顾客']), generatePaymentLink);
 
 // 支付成功确认 API（仅限管理员）
-// 模拟管理员手动确认支付状态
-app.post('/api/payment/confirm', authMiddleware(['管理员']), handlePaymentSuccess);
-
-// 支付成功确认 API（仅限管理员）
-// 模拟管理员手动确认支付状态
 app.post('/api/payment/confirm', authMiddleware(['管理员']), handlePaymentSuccess);
 
 // 更新订单支付状态 API（仅限管理员）
-// 用于管理员手动确认订单支付完成后，更新订单状态
 app.put('/api/orders/confirm-payment', authMiddleware(['管理员']), async (req, res) => {
   const { orderId } = req.body;
 
@@ -92,28 +83,23 @@ app.put('/api/orders/confirm-payment', authMiddleware(['管理员']), async (req
   }
 
   try {
-    // 连接到数据库
     const pool = await sql.connect();
     const request = new sql.Request(pool);
 
-    // 设定输入参数
     request.input('order_id', sql.Int, orderId);
     request.input('status', sql.NVarChar, 'paid');
-    request.input('paid_at', sql.DateTime, new Date()); // 更新支付时间
+    request.input('paid_at', sql.DateTime, new Date());
 
-    // 执行 SQL 更新语句
     const result = await request.query(`
       UPDATE [order]
       SET status = @status, paid_at = @paid_at
       WHERE order_id = @order_id;
     `);
 
-    // 检查是否有受影响的行
     if (result.rowsAffected[0] === 0) {
       return res.status(404).json({ message: '订单未找到' });
     }
 
-    // 返回成功响应
     res.status(200).json({ message: '订单支付状态已更新' });
   } catch (error) {
     console.error('Error updating payment status:', error);
@@ -121,6 +107,130 @@ app.put('/api/orders/confirm-payment', authMiddleware(['管理员']), async (req
   }
 });
 
+// 获取订单统计信息 API（管理员可以查看所有用户的信息，顾客只能查看自己的）
+app.get('/api/orders/summary', authMiddleware(['顾客', '管理员']), async (req, res) => {
+  const { userId, role } = req.user; // 从解码后的 Token 中提取用户 ID 和角色
+
+  try {
+    const pool = await sql.connect();
+    let result;
+
+    if (role === '管理员') {
+      // 如果是管理员，返回所有用户的订单统计信息
+      result = await pool.request().query(`
+        SELECT username, user_id, order_count, total_spent
+        FROM OrderSummary
+      `);
+    } else if (role === '顾客') {
+      // 如果是顾客，返回该顾客的订单统计信息
+      result = await pool.request()
+        .input('user_id', sql.Int, userId)
+        .query(`
+          SELECT username, user_id, order_count, total_spent
+          FROM OrderSummary
+          WHERE user_id = @user_id
+        `);
+    } else {
+      return res.status(403).json({ message: '您无权查看订单统计信息' });
+    }
+
+    // 打印返回的记录，确保返回了 username 列
+    console.log('Order Summary Query Result:', result.recordset);
+
+    res.status(200).json(result.recordset);
+  } catch (error) {
+    console.error('Error fetching order summary:', error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
+
+
+// 确保订单统计视图已创建（管理员权限）
+app.post('/api/views/create', authMiddleware(['管理员']), async (req, res) => {
+  try {
+    const pool = await sql.connect();
+    const query = `
+    IF NOT EXISTS (SELECT * FROM sys.views WHERE name = 'OrderSummary')
+    BEGIN
+        EXEC('
+            CREATE VIEW OrderSummary AS
+            SELECT u.username, o.user_id, COUNT(o.order_id) AS order_count, SUM(o.total_amount) AS total_spent
+            FROM [order] o
+            JOIN [user] u ON o.user_id = u.user_id
+            GROUP BY u.username, o.user_id;
+        ')
+    END
+    `;
+    await pool.request().query(query);
+    res.status(201).json({ message: '视图创建成功或已存在' });
+  } catch (error) {
+    console.error('Error while creating OrderSummary view:', error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
+
+// 更新订单统计视图 API
+app.post('/api/orders/update-summary-view', authMiddleware(['顾客', '管理员']), async (req, res) => {
+  try {
+    const pool = await sql.connect();
+    const query = `
+      IF EXISTS (SELECT * FROM sys.views WHERE name = 'OrderSummary')
+      BEGIN
+          EXEC('
+              ALTER VIEW OrderSummary AS
+              SELECT username, user_id, COUNT(order_id) AS order_count, SUM(total_amount) AS total_spent
+              FROM [order]
+              GROUP BY user_id;
+          ')
+      END
+    `;
+    await pool.request().query(query);
+    res.status(200).json({ message: '视图更新成功' });
+  } catch (error) {
+    console.error('Error while updating OrderSummary view:', error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
+// 删除视图 API（仅限管理员）
+app.delete('/api/views/delete', authMiddleware(['管理员']), async (req, res) => {
+  try {
+    const pool = await sql.connect();
+    await pool.request().query('DROP VIEW IF EXISTS OrderSummary');
+    res.status(200).json({ message: '视图删除成功' });
+  } catch (error) {
+    console.error('Error deleting view:', error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
+// 管理索引 API（仅限管理员）
+app.post('/api/indexes/create', authMiddleware(['管理员']), async (req, res) => {
+  try {
+    const pool = await sql.connect();
+    await pool.request().query(`
+      CREATE INDEX idx_user_id ON [order] (user_id);
+    `);
+    res.status(201).json({ message: '索引创建成功' });
+  } catch (error) {
+    console.error('Error creating index:', error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
+// 删除索引 API（仅限管理员）
+app.delete('/api/indexes/delete', authMiddleware(['管理员']), async (req, res) => {
+  try {
+    const pool = await sql.connect();
+    await pool.request().query('DROP INDEX idx_user_id ON [order]');
+    res.status(200).json({ message: '索引删除成功' });
+  } catch (error) {
+    console.error('Error deleting index:', error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
 
 // 未匹配路由的错误处理
 app.use((req, res, next) => {

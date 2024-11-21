@@ -8,10 +8,13 @@ function CustomerPage() {
   const [previousOrders, setPreviousOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [error, setError] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [orderSummary, setOrderSummary] = useState([]);
   const navigate = useNavigate(); // 使用 useNavigate 进行导航
 
   // 从 localStorage 中获取用户名
   const username = localStorage.getItem('username');
+  const userId = localStorage.getItem('userId');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -22,12 +25,16 @@ function CustomerPage() {
     }
     fetchDishes();
     fetchPreviousOrders(token);
-  }, [navigate]);
+    fetchOrderSummary(token);
+  }, [navigate, sortOrder]);
 
   const fetchDishes = () => {
     axios.get('http://localhost:5000/api/dishes')
       .then(response => {
-        setDishes(response.data);
+        const sortedDishes = response.data.sort((a, b) => {
+          return sortOrder === 'asc' ? a.price - b.price : b.price - a.price;
+        });
+        setDishes(sortedDishes);
       })
       .catch(error => {
         console.error('Error fetching dishes:', error);
@@ -36,7 +43,7 @@ function CustomerPage() {
 
   const fetchPreviousOrders = (token) => {
     setLoadingOrders(true);
-    axios.get('http://localhost:5000/api/orders', {
+    axios.get(`http://localhost:5000/api/orders?user_id=${userId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -58,6 +65,24 @@ function CustomerPage() {
     });
   };
 
+  const fetchOrderSummary = (token) => {
+    axios.get(`http://localhost:5000/api/orders/summary`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      params: {
+        userId: userId, // 确保这里传入了 `userId`
+      },
+    })
+    .then(response => {
+      console.log('Order Summary Response:', response.data);
+      setOrderSummary(response.data);
+    })
+    .catch(error => {
+      console.error('Error fetching order summary:', error);
+    });
+  };
+  
   const addToOrder = (dish) => {
     setOrder([...order, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1 }]);
   };
@@ -68,7 +93,6 @@ function CustomerPage() {
 
   const placeOrder = () => {
     const token = localStorage.getItem('token');
-    const userId = localStorage.getItem('userId');
 
     if (!userId) {
       alert('用户 ID 不存在，请重新登录');
@@ -95,6 +119,10 @@ function CustomerPage() {
       if (orderId) {
         // 跳转到支付页面
         navigate(`/payment/${orderId}`);
+        
+        // 新增：重新获取订单统计信息和历史订单
+        fetchOrderSummary(token);
+        fetchPreviousOrders(token);
       } else {
         alert('订单提交失败，请稍后重试。');
       }
@@ -134,6 +162,9 @@ function CustomerPage() {
 
         <div style={styles.section}>
           <h2 style={styles.subHeader}>菜品列表</h2>
+          <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} style={{ ...styles.button, marginBottom: '10px' }}>
+            {sortOrder === 'asc' ? '按价格降序排序' : '按价格升序排序'}
+          </button>
           <div style={styles.dishes}>
             {dishes.map(dish => (
               <div key={dish.dish_id} style={styles.dishCard}>
@@ -185,6 +216,21 @@ function CustomerPage() {
                   </li>
                 );
               })}
+            </ul>
+          )}
+        </div>
+
+        <div style={styles.section}>
+          <h2 style={styles.subHeader}>订单统计信息</h2>
+          {orderSummary.length === 0 ? (
+            <div>暂无订单统计信息</div>
+          ) : (
+            <ul>
+              {orderSummary.map((summary, index) => (
+                <li key={index}>
+                  用户 ID: {summary.user_id}, 订单数: {summary.order_count}, 总消费: ¥{summary.total_spent}
+                </li>
+              ))}
             </ul>
           )}
         </div>
