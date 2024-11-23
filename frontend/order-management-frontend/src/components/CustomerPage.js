@@ -10,7 +10,7 @@ function CustomerPage() {
   const [error, setError] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
   const [orderSummary, setOrderSummary] = useState([]);
-  const navigate = useNavigate(); // 使用 useNavigate 进行导航
+  const navigate = useNavigate();
 
   // 从 localStorage 中获取用户名
   const username = localStorage.getItem('username');
@@ -20,7 +20,7 @@ function CustomerPage() {
     const token = localStorage.getItem('token');
     if (!token) {
       alert('请先登录');
-      navigate('/login'); // 使用 useNavigate 重定向到登录页面
+      navigate('/login');
       return;
     }
     fetchDishes();
@@ -71,11 +71,10 @@ function CustomerPage() {
         Authorization: `Bearer ${token}`,
       },
       params: {
-        userId: userId, // 确保这里传入了 `userId`
+        userId: userId,
       },
     })
     .then(response => {
-      console.log('Order Summary Response:', response.data);
       setOrderSummary(response.data);
     })
     .catch(error => {
@@ -84,7 +83,27 @@ function CustomerPage() {
   };
   
   const addToOrder = (dish) => {
-    setOrder([...order, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1 }]);
+    const existingOrder = order.find(item => item.dish_id === dish.dish_id);
+    if (existingOrder) {
+      if (existingOrder.quantity < dish.stock) {
+        updateDishQuantity(dish.dish_id, existingOrder.quantity + 1);
+      }
+    } else {
+      setOrder([...order, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1, maxQuantity: dish.stock }]);
+    }
+  };
+
+  const removeFromOrder = (dishId) => {
+    setOrder(order.filter(item => item.dish_id !== dishId));
+  };
+
+  const updateDishQuantity = (dishId, quantity) => {
+    setOrder(order.map(item => {
+      if (item.dish_id === dishId) {
+        return { ...item, quantity };
+      }
+      return item;
+    }));
   };
 
   const calculateTotal = () => {
@@ -93,18 +112,18 @@ function CustomerPage() {
 
   const placeOrder = () => {
     const token = localStorage.getItem('token');
-
+  
     if (!userId) {
       alert('用户 ID 不存在，请重新登录');
-      navigate('/login'); // 使用 useNavigate 重定向到登录页面
+      navigate('/login');
       return;
     }
-
+  
     const orderItems = order.map(dish => ({
       dish_id: dish.dish_id,
       quantity: dish.quantity,
     }));
-
+  
     axios.post('http://localhost:5000/api/orders', {
       user_id: parseInt(userId),
       order_items: orderItems,
@@ -115,12 +134,23 @@ function CustomerPage() {
       },
     }).then(response => {
       const { orderId } = response.data;
-
+  
       if (orderId) {
+        // 下单成功后，更新销量
+        order.forEach(dish => {
+          axios.put(`http://localhost:5000/api/dishes/${dish.dish_id}/sales`, {
+            quantity: dish.quantity,
+          }, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }).catch(error => {
+            console.error('Error updating sales:', error);
+          });
+        });
+  
         // 跳转到支付页面
         navigate(`/payment/${orderId}`);
-        
-        // 新增：重新获取订单统计信息和历史订单
         fetchOrderSummary(token);
         fetchPreviousOrders(token);
       } else {
@@ -131,6 +161,7 @@ function CustomerPage() {
       alert('订单提交失败！');
     });
   };
+  
 
   const deleteOrder = (orderId) => {
     const token = localStorage.getItem('token');
@@ -170,7 +201,31 @@ function CustomerPage() {
               <div key={dish.dish_id} style={styles.dishCard}>
                 <h3>{dish.dish_name}</h3>
                 <p>价格: ¥{dish.price}</p>
+                <p>库存: {dish.stock}</p>
+                <div style={styles.quantityControl}>
+                  <button 
+                    style={styles.quantityButton}
+                    onClick={() => updateDishQuantity(dish.dish_id, Math.max(1, order.find(item => item.dish_id === dish.dish_id)?.quantity - 1 || 1))}
+                    disabled={!order.find(item => item.dish_id === dish.dish_id) || order.find(item => item.dish_id === dish.dish_id)?.quantity <= 1}
+                  >
+                    -
+                  </button>
+                  <input 
+                    type="number" 
+                    value={order.find(item => item.dish_id === dish.dish_id)?.quantity || 1} 
+                    readOnly
+                    style={styles.quantityInput}
+                  />
+                  <button 
+                    style={styles.quantityButton}
+                    onClick={() => updateDishQuantity(dish.dish_id, Math.min(dish.stock, (order.find(item => item.dish_id === dish.dish_id)?.quantity || 1) + 1))}
+                    disabled={order.find(item => item.dish_id === dish.dish_id)?.quantity >= dish.stock}
+                  >
+                    +
+                  </button>
+                </div>
                 <button onClick={() => addToOrder(dish)} style={styles.button}>添加到订单</button>
+                <button onClick={() => removeFromOrder(dish.dish_id)} style={styles.cancelButton}>取消添加</button>
               </div>
             ))}
           </div>
@@ -205,7 +260,7 @@ function CustomerPage() {
                 const formattedTime = order.created_at
                   .replace('T', ' ')
                   .replace('Z', '')
-                  .replace(/\.\d+/, '') // 移除毫秒部分
+                  .replace(/\.\d+/, '')
                   .replace(/-/g, '年')
                   .replace(/(\d{4}年\d{2})/, '$1月')
                   .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1日 $2时$3分$4秒');
@@ -290,6 +345,43 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s ease',
     outline: 'none',
+  },
+  cancelButton: {
+    backgroundColor: '#dc3545',
+    color: '#fff',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    outline: 'none',
+    marginTop: '10px',
+  },
+  quantityControl: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: '10px',
+  },
+  quantityButton: {
+    backgroundColor: '#007bff',
+    color: '#fff',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    outline: 'none',
+    margin: '0 5px',
+  },
+  quantityInput: {
+    width: '50px',
+    textAlign: 'center',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    padding: '5px',
+    fontSize: '16px',
+    lineHeight: '1.5',
   },
 };
 

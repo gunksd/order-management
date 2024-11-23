@@ -7,7 +7,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { loginUser, registerUser } = require('./controllers/userController');
-const { getDishes, addDish, deleteDish, updateDish } = require('./controllers/dishController');
+const { getDishes, addDish, deleteDish, updateDish, updateDishSales } = require('./controllers/dishController');
 const { placeOrder, getUserOrders, deleteOrder, getOrderSummary } = require('./controllers/orderController');
 const { generatePaymentLink, handlePaymentSuccess } = require('./controllers/paymentController');
 const { authMiddleware } = require('./middlewares/authMiddleware');
@@ -73,6 +73,9 @@ app.post('/api/payment/generate', authMiddleware(['顾客']), generatePaymentLin
 
 // 支付成功确认 API（仅限管理员）
 app.post('/api/payment/confirm', authMiddleware(['管理员']), handlePaymentSuccess);
+
+// 更新菜品销量 API
+app.put('/api/dishes/:dishId/sales', authMiddleware(['顾客']), updateDishSales);
 
 // 更新订单支付状态 API（仅限管理员）
 app.put('/api/orders/confirm-payment', authMiddleware(['管理员']), async (req, res) => {
@@ -219,6 +222,7 @@ app.post('/api/indexes/create', authMiddleware(['管理员']), async (req, res) 
     res.status(500).json({ message: '服务器错误', error: error.message });
   }
 });
+
 
 // 删除索引 API（仅限管理员）
 app.delete('/api/indexes/delete', authMiddleware(['管理员']), async (req, res) => {

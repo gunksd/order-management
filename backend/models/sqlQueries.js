@@ -117,6 +117,12 @@ const getUserOrderSummary = `
     FROM UserOrderSummary 
     WHERE user_id = @user_id;
 `;
+// 更新菜品销量
+const updateDishSales = `
+    UPDATE dish 
+    SET sales = sales + @quantity 
+    WHERE dish_id = @dish_id;
+`;
 
 module.exports = {
     getUserByUsername,
@@ -137,5 +143,6 @@ module.exports = {
     dropUserOrderSummaryView,
     createUserIndex,
     dropUserIndex,
-    getUserOrderSummary
+    getUserOrderSummary,
+    updateDishSales,
 };

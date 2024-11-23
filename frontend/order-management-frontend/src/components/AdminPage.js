@@ -407,7 +407,7 @@ const handleConfirmPayment = async (orderId) => {
           <ul style={styles.dishList}>
             {filteredDishes.map((dish) => (
               <li key={dish.dish_id} style={styles.dishItem}>
-                {dish.dish_name} - ¥{dish.price} - 库存：{dish.stock}
+                {dish.dish_name} - ¥{dish.price} - 库存：{dish.stock} - 销量：{dish.sales || 0}
                 <div>
                   <button
                     onClick={() => handleEditDish(dish)}
