@@ -96,7 +96,7 @@ function PaymentPage() {
             <p style={styles.amount}>支付金额：{amount} 元</p>
             <p style={styles.instruction}>请务必在支付时备注订单号：{orderId}</p>
             <p style={styles.instruction}>支付完成后请耐心等待订单确认...</p>
-            <button onClick={handlePaymentSuccess} style={styles.successButton}>点点我吧！有小惊喜哦~</button>
+            <button onClick={handlePaymentSuccess} style={styles.successButton}>我已支付，返回上一级页面</button>
             <button onClick={handleCancel} style={styles.cancelButton}>取消</button>
           </>
         ) : (
