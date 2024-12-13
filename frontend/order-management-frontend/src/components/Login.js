@@ -22,6 +22,7 @@ function Login({ onLogin }) {
       localStorage.setItem('token', token);
       localStorage.setItem('userId', userId);
       localStorage.setItem('username', username);
+      localStorage.setItem('role', role); // 确保角色被存储
       onLogin(role);
 
       if (role === '顾客') {
