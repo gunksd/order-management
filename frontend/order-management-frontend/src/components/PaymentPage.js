@@ -80,7 +80,7 @@ function PaymentPage() {
     setShowConfetti(true);
     setTimeout(() => {
       navigate('/customer');
-    }, 5000);
+    }, 3000);
   };
 
   return (
