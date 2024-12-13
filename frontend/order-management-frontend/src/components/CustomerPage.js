@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
 
 function CustomerPage() {
   const [dishes, setDishes] = useState([]);
@@ -12,21 +13,35 @@ function CustomerPage() {
   const [orderSummary, setOrderSummary] = useState([]);
   const navigate = useNavigate();
 
-  // 从 localStorage 中获取用户名
+  // 从 localStorage 中获取用户名和用户ID
   const username = localStorage.getItem('username');
   const userId = localStorage.getItem('userId');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
+    if (token) {
+      const decoded = jwtDecode(token);
+      console.log(decoded);  // 打印出 token 的内容
+
+      const isExpired = decoded.exp * 1000 < Date.now();
+      console.log('Token过期时间:', new Date(decoded.exp * 1000).toLocaleString());
+      console.log('当前时间:', new Date(Date.now()).toLocaleString());
+      console.log('Token是否过期:', isExpired);
+      if (isExpired) {
+        alert('Token 已过期');
+        navigate('/login');
+      } else {
+        // Token 有效，开始加载数据
+        fetchDishes();
+        fetchPreviousOrders(token);
+        fetchOrderSummary(token);
+      }
+    } else {
       alert('请先登录');
       navigate('/login');
-      return;
     }
-    fetchDishes();
-    fetchPreviousOrders(token);
-    fetchOrderSummary(token);
-  }, [navigate, sortOrder]);
+
+  }, [navigate, sortOrder]); // `navigate` 和 `sortOrder` 是依赖项
 
   const fetchDishes = () => {
     axios.get('http://localhost:5000/api/dishes')

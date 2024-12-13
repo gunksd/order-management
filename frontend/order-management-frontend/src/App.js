@@ -27,6 +27,7 @@ function App() {
           path="/admin"
           element={role === '管理员' ? <AdminPage /> : <Navigate to="/" />}
         />
+
         {/* 添加支付页面的路由 */}
         <Route
           path="/payment/:orderId"
