@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
@@ -149,6 +149,54 @@ const styles = {
       backgroundColor: '#c0392b',
     },
   },
+  recommendedSection: {
+    marginTop: '20px',
+    padding: '20px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+  },
+  recommendedHeader: {
+    fontSize: '22px',
+    color: '#2c3e50',
+    marginBottom: '15px',
+    fontWeight: 'bold',
+  },
+  recommendedDishCard: {
+    backgroundColor: '#ffffff',
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    padding: '15px',
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      transform: 'translateY(-5px)',
+      boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
+    },
+  },
+  recommendedDishName: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '10px',
+  },
+  recommendedPriceTag: {
+    display: 'flex',
+    alignItems: 'center',
+    color: '#e74c3c',
+    fontWeight: 'bold',
+    marginBottom: '10px',
+  },
+  recommendedButton: {
+    backgroundColor: '#3498db',
+    color: '#ffffff',
+    border: 'none',
+    padding: '8px 15px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      backgroundColor: '#2980b9',
+    },
+  },
 };
 
 function CustomerPage() {
@@ -159,9 +207,9 @@ function CustomerPage() {
   const [error, setError] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
   const [orderSummary, setOrderSummary] = useState([]);
+  const [recommendedDishes, setRecommendedDishes] = useState([]);
   const navigate = useNavigate();
 
-  // 从 localStorage 中获取用户名和用户ID
   const username = localStorage.getItem('username');
   const userId = localStorage.getItem('userId');
 
@@ -169,7 +217,7 @@ function CustomerPage() {
     const token = localStorage.getItem('token');
     if (token) {
       const decoded = jwtDecode(token);
-      console.log(decoded);  // 打印出 token 的内容
+      console.log(decoded);
 
       const isExpired = decoded.exp * 1000 < Date.now();
       console.log('Token过期时间:', new Date(decoded.exp * 1000).toLocaleString());
@@ -179,7 +227,6 @@ function CustomerPage() {
         alert('Token 已过期');
         navigate('/login');
       } else {
-        // Token 有效，开始加载数据
         fetchDishes();
         fetchPreviousOrders(token);
         fetchOrderSummary(token);
@@ -188,8 +235,7 @@ function CustomerPage() {
       alert('请先登录');
       navigate('/login');
     }
-
-  }, [navigate, sortOrder]); // `navigate` 和 `sortOrder` 是依赖项
+  }, [navigate, sortOrder]);
 
   const fetchDishes = () => {
     axios.get('http://localhost:5000/api/dishes')
@@ -253,6 +299,7 @@ function CustomerPage() {
         const existingItem = prevOrder.find(item => item.dish_id === dishId);
         if (existingItem) {
           if (newQuantity === 0) {
+            setRecommendedDishes([]); // 清除推荐菜品
             return prevOrder.filter(item => item.dish_id !== dishId);
           }
           return prevOrder.map(item =>
@@ -263,6 +310,9 @@ function CustomerPage() {
         }
         return prevOrder;
       });
+      if (quantity > 0) {
+        updateRecommendedDishes(dish);
+      }
     }
   };
 
@@ -273,12 +323,21 @@ function CustomerPage() {
         updateDishQuantity(dish.dish_id, existingOrder.quantity + 1);
       }
     } else {
-      setOrder([...order, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1, maxQuantity: dish.stock }]);
+      setOrder(prevOrder => [...prevOrder, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1, maxQuantity: dish.stock }]);
+    }
+    if (order.length > 0) { // 只有当订单中有菜品时才更新推荐
+      updateRecommendedDishes(dish);
     }
   };
 
   const removeFromOrder = (dishId) => {
-    setOrder(order.filter(item => item.dish_id !== dishId));
+    setOrder(prevOrder => {
+      const newOrder = prevOrder.filter(item => item.dish_id !== dishId);
+      if (newOrder.length === 0) {
+        setRecommendedDishes([]); // 如果订单为空，清除所有推荐
+      }
+      return newOrder;
+    });
   };
 
   const calculateTotal = () => {
@@ -311,7 +370,6 @@ function CustomerPage() {
       const { orderId } = response.data;
 
       if (orderId) {
-        // 下单成功后，更新销量
         order.forEach(dish => {
           axios.put(`http://localhost:5000/api/dishes/${dish.dish_id}/sales`, {
             quantity: dish.quantity,
@@ -324,7 +382,6 @@ function CustomerPage() {
           });
         });
 
-        // 跳转到支付页面
         navigate(`/payment/${orderId}`);
         fetchOrderSummary(token);
         fetchPreviousOrders(token);
@@ -336,7 +393,6 @@ function CustomerPage() {
       alert('订单提交失败！');
     });
   };
-
 
   const deleteOrder = (orderId) => {
     if (window.confirm('确定要删除这个订单吗？')) {
@@ -361,6 +417,21 @@ function CustomerPage() {
         alert('删除订单失败，请稍后重试。');
       });
     }
+  };
+
+  const updateRecommendedDishes = (addedDish) => {
+    // 推荐价格相近（±10%）的其他菜品
+    const priceLowerBound = addedDish.price * 0.9;
+    const priceUpperBound = addedDish.price * 1.1;
+    
+    const recommended = dishes.filter(dish => 
+      dish.dish_id !== addedDish.dish_id &&
+      dish.price >= priceLowerBound &&
+      dish.price <= priceUpperBound
+    ).slice(0, 3);  // 最多推荐3个菜品
+
+    console.log('Recommended dishes:', recommended); // 添加日志
+    setRecommendedDishes(recommended);
   };
 
   return (
@@ -413,6 +484,30 @@ function CustomerPage() {
           </div>
         </div>
 
+        <div style={styles.recommendedSection}>
+          <h2 style={styles.recommendedHeader}>
+            <FaUtensils style={styles.icon} />
+            推荐菜品
+          </h2>
+          {recommendedDishes.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+              {recommendedDishes.map(dish => (
+                <div key={dish.dish_id} style={styles.recommendedDishCard}>
+                  <h3 style={styles.recommendedDishName}>{dish.dish_name}</h3>
+                  <p style={styles.recommendedPriceTag}>
+                    <IoMdPricetag style={styles.icon} />
+                    价格: ¥{dish.price}
+                  </p>
+                  <p>库存: {dish.stock}</p>
+                  <button onClick={() => addToOrder(dish)} style={styles.recommendedButton}>添加到订单</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>暂无推荐菜品</p>
+          )}
+        </div>
+
         {order.length > 0 && (
           <div style={styles.section}>
             <h2 style={styles.subHeader}>
@@ -431,6 +526,7 @@ function CustomerPage() {
             <button onClick={placeOrder} style={styles.button}>提交订单</button>
           </div>
         )}
+
 
         <div style={styles.section}>
           <h2 style={styles.subHeader}>
