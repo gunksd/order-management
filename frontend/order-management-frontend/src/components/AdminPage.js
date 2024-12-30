@@ -150,19 +150,21 @@ const handleConfirmPayment = async (orderId) => {
 
   // 取消订单
   const handleCancelOrder = async (orderId) => {
-    try {
-      const token = localStorage.getItem('token');
-      console.log('Using token to cancel order:', token);
-      await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      alert('订单取消成功');
-      fetchOrders();
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-      setOrderError('取消订单失败，请稍后重试。');
+    if (window.confirm('确定要取消这个订单吗？')) {
+      try {
+        const token = localStorage.getItem('token');
+        console.log('Using token to cancel order:', token);
+        await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        alert('订单取消成功');
+        fetchOrders();
+      } catch (error) {
+        console.error('Error cancelling order:', error);
+        setOrderError('取消订单失败，请稍后重试。');
+      }
     }
   };
 
@@ -225,19 +227,21 @@ const handleConfirmPayment = async (orderId) => {
 
   // 删除菜品
   const handleDeleteDish = async (dishId) => {
-    try {
-      const token = localStorage.getItem('token');
-      console.log('Using token to delete dish:', token);
-      await axios.delete(`http://localhost:5000/api/dishes/${dishId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      alert('菜品删除成功');
-      fetchDishes();
-    } catch (error) {
-      console.error('Error deleting dish:', error);
-      handleAuthError(error, '删除菜品失败，请稍后重试。');
+    if (window.confirm('确定要删除这个菜品吗？')) {
+      try {
+        const token = localStorage.getItem('token');
+        console.log('Using token to delete dish:', token);
+        await axios.delete(`http://localhost:5000/api/dishes/${dishId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        alert('菜品删除成功');
+        fetchDishes();
+      } catch (error) {
+        console.error('Error deleting dish:', error);
+        handleAuthError(error, '删���菜品失败，请稍后重试。');
+      }
     }
   };
 
@@ -300,25 +304,37 @@ const handleConfirmPayment = async (orderId) => {
     const searchButton = searchButtonRef.current;
 
     if (searchButton) {
-      let offsetX, offsetY;
+      let isDragging = false;
+      let startX, startY;
+
       const handleMouseDown = (e) => {
-        offsetX = e.clientX - searchButton.getBoundingClientRect().left;
-        offsetY = e.clientY - searchButton.getBoundingClientRect().top;
+        isDragging = true;
+        startX = e.clientX - searchButton.offsetLeft;
+        startY = e.clientY - searchButton.offsetTop;
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
       };
+
       const handleMouseMove = (e) => {
-        searchButton.style.left = `${e.clientX - offsetX}px`;
-        searchButton.style.top = `${e.clientY - offsetY}px`;
+        if (!isDragging) return;
+        const newX = e.clientX - startX;
+        const newY = e.clientY - startY;
+        searchButton.style.left = `${newX}px`;
+        searchButton.style.top = `${newY}px`;
       };
+
       const handleMouseUp = () => {
+        isDragging = false;
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
       };
+
       searchButton.addEventListener('mousedown', handleMouseDown);
 
       return () => {
         searchButton.removeEventListener('mousedown', handleMouseDown);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
       };
     }
   }, []);
@@ -683,6 +699,26 @@ const styles = {
     textAlign: 'center',
     padding: '20px',
   },
+  confirmButton: {
+    backgroundColor: '#28a745',
+    color: '#fff',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    marginRight: '10px',
+    transition: 'all 0.3s ease',
+  },
+  cancelButton: {
+    backgroundColor: '#dc3545',
+    color: '#fff',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+  },
 };
 
 export default AdminPage;
+

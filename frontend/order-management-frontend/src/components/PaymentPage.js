@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import Confetti from 'react-confetti';
+import Lottie from 'lottie-react';
+import { FaQrcode, FaMoneyBillWave, FaInfoCircle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import successAnimation from '../assets/payment-success.json';
 
 function PaymentPage() {
   const { orderId } = useParams();
@@ -9,18 +11,17 @@ function PaymentPage() {
   const [paymentLink, setPaymentLink] = useState(null);
   const [amount, setAmount] = useState(null);
   const [error, setError] = useState(null);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
   useEffect(() => {
     const initiatePayment = async () => {
       try {
-        const token = localStorage.getItem('token'); // 获取用户的 token
+        const token = localStorage.getItem('token');
 
         if (!token) {
           throw new Error('未找到用户令牌，请重新登录。');
         }
 
-        // 请求支付链接
         const response = await axios.post(
           'http://localhost:5000/api/payment/generate',
           { orderId },
@@ -32,7 +33,6 @@ function PaymentPage() {
         );
 
         if (response.data && response.data.payUrl) {
-          // 设置支付链接和金额
           setPaymentLink(response.data.payUrl);
           setAmount(response.data.amount);
         } else {
@@ -61,7 +61,6 @@ function PaymentPage() {
         return;
       }
 
-      // 发起删除订单请求
       await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -77,27 +76,56 @@ function PaymentPage() {
   };
 
   const handlePaymentSuccess = () => {
-    setShowConfetti(true);
+    setShowSuccessAnimation(true);
     setTimeout(() => {
       navigate('/customer');
-    }, 3000);
+    }, 2000);
   };
 
   return (
     <div style={styles.container}>
-      {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} />}
+      {showSuccessAnimation && (
+        <div style={styles.successAnimationOverlay}>
+          <Lottie
+            animationData={successAnimation}
+            loop={false}
+            style={styles.successAnimation}
+          />
+        </div>
+      )}
       <div style={styles.card}>
         {error ? (
-          <h2 style={styles.error}>{error}</h2>
+          <div style={styles.errorContainer}>
+            <FaTimesCircle style={styles.icon} />
+            <h2 style={styles.error}>{error}</h2>
+          </div>
         ) : paymentLink ? (
           <>
-            <h2 style={styles.header}>请使用支付宝扫描下方二维码进行支付</h2>
+            <h2 style={styles.header}>
+              <FaQrcode style={styles.icon} />
+              请使用支付宝扫描二维码支付
+            </h2>
             <img src={paymentLink} alt="支付二维码" style={styles.qrCode} />
-            <p style={styles.amount}>支付金额：{amount} 元</p>
-            <p style={styles.instruction}>请务必在支付时备注订单号：{orderId}</p>
-            <p style={styles.instruction}>支付完成后请耐心等待订单确认...</p>
-            <button onClick={handlePaymentSuccess} style={styles.successButton}>我已支付，返回上一级页面</button>
-            <button onClick={handleCancel} style={styles.cancelButton}>取消</button>
+            <p style={styles.amount}>
+              <FaMoneyBillWave style={styles.icon} />
+              支付金额：{amount} 元
+            </p>
+            <div style={styles.instructionContainer}>
+              <FaInfoCircle style={styles.icon} />
+              <p style={styles.instruction}>
+                请务必在支付时备注订单号：{orderId}
+                <br />
+                支付完成后请耐心等待订单确认...
+              </p>
+            </div>
+            <button onClick={handlePaymentSuccess} style={styles.successButton}>
+              <FaCheckCircle style={styles.buttonIcon} />
+              我已支付，返回上一级页面
+            </button>
+            <button onClick={handleCancel} style={styles.cancelButton}>
+              <FaTimesCircle style={styles.buttonIcon} />
+              取消订单
+            </button>
           </>
         ) : (
           <h2 style={styles.loading}>正在生成支付链接，请稍候...</h2>
@@ -107,89 +135,148 @@ function PaymentPage() {
   );
 }
 
-// 样式
 const styles = {
   container: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f4f7fa',
     padding: '20px',
   },
   card: {
     backgroundColor: '#fff',
     padding: '40px',
-    borderRadius: '15px',
-    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
+    borderRadius: '20px',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
     maxWidth: '500px',
     width: '100%',
     textAlign: 'center',
-    transition: 'transform 0.3s ease',
+    transition: 'all 0.3s ease',
     animation: 'fadeIn 0.8s ease',
   },
   header: {
     color: '#333',
-    marginBottom: '20px',
-    fontSize: '20px',
-    fontWeight: '500',
+    marginBottom: '30px',
+    fontSize: '24px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   qrCode: {
-    width: '300px',
-    height: '300px',
+    width: '250px',
+    height: '250px',
     marginTop: '20px',
-    borderRadius: '10px',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+    borderRadius: '15px',
+    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.1)',
   },
   amount: {
-    marginTop: '15px',
-    fontSize: '18px',
+    marginTop: '25px',
+    fontSize: '22px',
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2ecc71',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instructionContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: '10px',
+    padding: '15px',
+    marginTop: '20px',
+    display: 'flex',
+    alignItems: 'flex-start',
   },
   instruction: {
     color: '#555',
-    marginTop: '10px',
     fontSize: '14px',
+    lineHeight: '1.6',
+    margin: 0,
+    textAlign: 'left',
+    marginLeft: '10px',
   },
   loading: {
     color: '#888',
     fontSize: '18px',
   },
+  errorContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
   error: {
-    color: 'red',
+    color: '#e74c3c',
     fontSize: '18px',
+    marginTop: '10px',
   },
   successButton: {
-    marginTop: '20px',
-    padding: '10px 20px',
-    backgroundColor: '#28a745',
+    marginTop: '30px',
+    padding: '12px 24px',
+    backgroundColor: '#2ecc71',
     color: '#fff',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
+    fontSize: '16px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
   cancelButton: {
-    marginTop: '10px',
-    padding: '10px 20px',
-    backgroundColor: '#dc3545',
+    marginTop: '15px',
+    padding: '12px 24px',
+    backgroundColor: '#e74c3c',
     color: '#fff',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
+    fontSize: '16px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  icon: {
+    marginRight: '10px',
+    fontSize: '24px',
+  },
+  buttonIcon: {
+    marginRight: '8px',
+    fontSize: '18px',
+  },
+  successAnimationOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  successAnimation: {
+    width: '400px',
+    height: '400px',
   },
   '@keyframes fadeIn': {
     '0%': {
       opacity: 0,
-      transform: 'scale(0.9)',
+      transform: 'translateY(20px)',
     },
     '100%': {
       opacity: 1,
-      transform: 'scale(1)',
+      transform: 'translateY(0)',
     },
   },
 };
 
 export default PaymentPage;
+
