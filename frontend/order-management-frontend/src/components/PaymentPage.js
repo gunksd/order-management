@@ -4,6 +4,7 @@ import axios from 'axios';
 import Lottie from 'lottie-react';
 import { FaQrcode, FaMoneyBillWave, FaInfoCircle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import successAnimation from '../assets/payment-success.json';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function PaymentPage() {
   const { orderId } = useParams();
@@ -12,6 +13,7 @@ function PaymentPage() {
   const [amount, setAmount] = useState(null);
   const [error, setError] = useState(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     const initiatePayment = async () => {
@@ -52,6 +54,10 @@ function PaymentPage() {
   }, [orderId, navigate]);
 
   const handleCancel = async () => {
+    setShowCancelConfirm(true);
+  };
+
+  const confirmCancel = async () => {
     try {
       const token = localStorage.getItem('token');
 
@@ -72,6 +78,8 @@ function PaymentPage() {
     } catch (error) {
       console.error('Error deleting order:', error);
       alert('取消订单失败，请稍后重试。');
+    } finally {
+      setShowCancelConfirm(false);
     }
   };
 
@@ -83,7 +91,12 @@ function PaymentPage() {
   };
 
   return (
-    <div style={styles.container}>
+    <motion.div
+      style={styles.container}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
       {showSuccessAnimation && (
         <div style={styles.successAnimationOverlay}>
           <Lottie
@@ -93,45 +106,122 @@ function PaymentPage() {
           />
         </div>
       )}
-      <div style={styles.card}>
-        {error ? (
-          <div style={styles.errorContainer}>
-            <FaTimesCircle style={styles.icon} />
-            <h2 style={styles.error}>{error}</h2>
-          </div>
-        ) : paymentLink ? (
-          <>
-            <h2 style={styles.header}>
-              <FaQrcode style={styles.icon} />
-              请使用支付宝扫描二维码支付
-            </h2>
-            <img src={paymentLink} alt="支付二维码" style={styles.qrCode} />
-            <p style={styles.amount}>
-              <FaMoneyBillWave style={styles.icon} />
-              支付金额：{amount} 元
-            </p>
-            <div style={styles.instructionContainer}>
-              <FaInfoCircle style={styles.icon} />
-              <p style={styles.instruction}>
-                请务必在支付时备注订单号：{orderId}
-                <br />
-                支付完成后请耐心等待订单确认...
+      <motion.div
+        style={styles.card}
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
+      >
+        <AnimatePresence mode="wait">
+          {error ? (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <div style={styles.errorContainer}>
+                <FaTimesCircle style={styles.icon} />
+                <h2 style={styles.error}>{error}</h2>
+              </div>
+            </motion.div>
+          ) : paymentLink ? (
+            <motion.div
+              key="payment"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <h2 style={styles.header}>
+                <FaQrcode style={styles.icon} />
+                请使用支付宝扫描二维码支付
+              </h2>
+              <motion.img
+                src={paymentLink}
+                alt="支付二维码"
+                style={styles.qrCode}
+                whileHover={{ scale: 1.05 }}
+              />
+              <p style={styles.amount}>
+                <FaMoneyBillWave style={styles.icon} />
+                支付金额：{amount} 元
               </p>
+              <div style={styles.instructionContainer}>
+                <FaInfoCircle style={styles.icon} />
+                <p style={styles.instruction}>
+                  请务必在支付时备注订单号：{orderId}
+                  <br />
+                  支付完成后请耐心等待订单确认...
+                </p>
+              </div>
+              <motion.button
+                onClick={handlePaymentSuccess}
+                style={styles.successButton}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FaCheckCircle style={styles.buttonIcon} />
+                我已支付，返回上一级页面
+              </motion.button>
+              <motion.button
+                onClick={handleCancel}
+                style={styles.cancelButton}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FaTimesCircle style={styles.buttonIcon} />
+                取消订单
+              </motion.button>
+            </motion.div>
+          ) : (
+            <motion.h2
+              key="loading"
+              style={styles.loading}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              正在生成支付链接，请稍候...
+            </motion.h2>
+          )}
+        </AnimatePresence>
+      </motion.div>
+      {showCancelConfirm && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={styles.confirmOverlay}
+        >
+          <motion.div
+            style={styles.confirmDialog}
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+          >
+            <h3>确认取消订单？</h3>
+            <p>您确定要取消此订单吗？此操作无法撤销。</p>
+            <div style={styles.confirmButtons}>
+              <motion.button
+                onClick={confirmCancel}
+                style={{ ...styles.confirmButton, backgroundColor: '#e74c3c' }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                确认取消
+              </motion.button>
+              <motion.button
+                onClick={() => setShowCancelConfirm(false)}
+                style={styles.confirmButton}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                返回
+              </motion.button>
             </div>
-            <button onClick={handlePaymentSuccess} style={styles.successButton}>
-              <FaCheckCircle style={styles.buttonIcon} />
-              我已支付，返回上一级页面
-            </button>
-            <button onClick={handleCancel} style={styles.cancelButton}>
-              <FaTimesCircle style={styles.buttonIcon} />
-              取消订单
-            </button>
-          </>
-        ) : (
-          <h2 style={styles.loading}>正在生成支付链接，请稍候...</h2>
-        )}
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </motion.div>
   );
 }
 
@@ -165,11 +255,12 @@ const styles = {
     justifyContent: 'center',
   },
   qrCode: {
-    width: '250px',
-    height: '250px',
+    width: '200px',
+    height: '200px',
     marginTop: '20px',
     borderRadius: '15px',
     boxShadow: '0 5px 15px rgba(0, 0, 0, 0.1)',
+    transition: 'all 0.3s ease',
   },
   amount: {
     marginTop: '25px',
@@ -263,8 +354,8 @@ const styles = {
     zIndex: 1000,
   },
   successAnimation: {
-    width: '400px',
-    height: '400px',
+    width: '300px',
+    height: '300px',
   },
   '@keyframes fadeIn': {
     '0%': {
@@ -275,6 +366,41 @@ const styles = {
       opacity: 1,
       transform: 'translateY(0)',
     },
+  },
+  confirmOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  confirmDialog: {
+    backgroundColor: '#fff',
+    padding: '20px',
+    borderRadius: '10px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    textAlign: 'center',
+  },
+  confirmButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '20px',
+  },
+  confirmButton: {
+    padding: '10px 20px',
+    margin: '0 10px',
+    backgroundColor: '#3498db',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '600',
   },
 };
 

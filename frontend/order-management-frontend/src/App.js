@@ -1,26 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
 import Login from './components/Login';
 import CustomerPage from './components/CustomerPage';
 import AdminPage from './components/AdminPage';
 import Register from './components/Register';
-import PaymentPage from './components/PaymentPage'; // 确保引入 PaymentPage 组件
+import PaymentPage from './components/PaymentPage';
+import { getToken, setToken, removeToken, isAuthenticated as checkAuth } from './utils/auth';
 
 function App() {
-  const [role, setRole] = useState(null); // 初始状态为空
+  const [role, setRole] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // 在组件加载时从 localStorage 获取角色信息
   useEffect(() => {
-    const savedRole = localStorage.getItem('role'); // 从 localStorage 中获取角色
-    if (savedRole) {
-      setRole(savedRole); // 如果角色信息存在，设置 role
-    }
-  }, []); // 空依赖数组，确保只在组件加载时执行一次
+    const checkAuthentication = () => {
+      const token = getToken();
+      const savedRole = localStorage.getItem('role');
+      
+      if (token && savedRole && checkAuth()) {
+        try {
+          const decodedToken = jwtDecode(token);
+          if (decodedToken.exp * 1000 > Date.now()) {
+            setRole(savedRole);
+            setIsAuthenticated(true);
+          } else {
+            // Token 过期
+            handleLogout();
+          }
+        } catch (error) {
+          console.error('无效的 token:', error);
+          handleLogout();
+        }
+      } else {
+        // 没有找到有效的 token 或角色
+        handleLogout();
+      }
+    };
 
-  // 登录后更新角色并存储到 localStorage
-  const handleLogin = (userRole) => {
-    setRole(userRole); // 更新角色状态
-    localStorage.setItem('role', userRole); // 将角色保存到 localStorage
+    checkAuthentication();
+  }, []);
+
+  const handleLogin = (userRole, token) => {
+    setRole(userRole);
+    setIsAuthenticated(true);
+    setToken(token);
+    localStorage.setItem('role', userRole);
+  };
+
+  const handleLogout = () => {
+    setRole(null);
+    setIsAuthenticated(false);
+    removeToken();
+    localStorage.removeItem('role');
+  };
+
+  const ProtectedRoute = ({ children, allowedRole }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/" replace />;
+    }
+    if (allowedRole && role !== allowedRole) {
+      return <Navigate to="/" replace />;
+    }
+    return children;
   };
 
   return (
@@ -28,19 +69,29 @@ function App() {
       <Routes>
         <Route path="/" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register />} />
-        {/* 根据用户角色跳转到不同页面 */}
         <Route
           path="/customer"
-          element={role === '顾客' ? <CustomerPage /> : <Navigate to="/" />}
+          element={
+            <ProtectedRoute allowedRole="顾客">
+              <CustomerPage onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/admin"
-          element={role === '管理员' ? <AdminPage /> : <Navigate to="/" />}
+          element={
+            <ProtectedRoute allowedRole="管理员">
+              <AdminPage onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
         />
-        {/* 添加支付页面的路由 */}
         <Route
           path="/payment/:orderId"
-          element={<PaymentPage />}
+          element={
+            <ProtectedRoute>
+              <PaymentPage onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
         />
       </Routes>
     </Router>
@@ -48,3 +99,4 @@ function App() {
 }
 
 export default App;
+

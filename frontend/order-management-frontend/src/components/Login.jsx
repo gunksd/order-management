@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { FaEye, FaEyeSlash, FaUser, FaLock } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import StarryBackground from '../StarryBackground.tsx';
+import { setToken } from '../utils/auth';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -21,11 +22,17 @@ function Login({ onLogin }) {
 
       const { token, role, userId } = response.data;
 
-      localStorage.setItem('token', token);
+      if (typeof token !== 'string' || !token.includes('.')) {
+        throw new Error('从服务器接收到的token格式无效');
+      }
+
+      setToken(token);
+      
       localStorage.setItem('userId', userId);
       localStorage.setItem('username', username);
       localStorage.setItem('role', role);
-      onLogin(role);
+      
+      onLogin(role, token);
 
       if (role === '顾客') {
         navigate('/customer');
@@ -34,7 +41,7 @@ function Login({ onLogin }) {
       }
     } catch (error) {
       setError('登录失败，请检查用户名或密码');
-      console.error('Login error:', error);
+      console.error('登录错误:', error);
     }
   };
 
@@ -72,7 +79,10 @@ function Login({ onLogin }) {
             placeholder="密码"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
+            style={{
+              ...styles.input,
+              letterSpacing: showPassword ? 'normal' : '0.1em',
+            }}
             onKeyDown={handleKeyDown}
           />
           <div
@@ -90,7 +100,16 @@ function Login({ onLogin }) {
         >
           登录
         </motion.button>
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            style={styles.error}
+          >
+            {error}
+          </motion.div>
+        )}
         <div style={styles.registerLink}>
           <span>还没有账号？</span>
           <Link to="/register" style={styles.registerButton}>
@@ -122,24 +141,24 @@ const styles = {
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     backdropFilter: 'blur(10px)',
-    padding: '30px',
-    borderRadius: '15px',
+    padding: '40px',
+    borderRadius: '20px',
     boxShadow: '0 8px 32px rgba(31, 38, 135, 0.37)',
-    maxWidth: '350px',
+    maxWidth: '400px',
     width: '100%',
     textAlign: 'center',
     position: 'relative',
     zIndex: 1,
   },
   header: {
-    marginBottom: '20px',
+    marginBottom: '25px',
     color: '#fff',
     fontSize: '24px',
     fontWeight: '600',
   },
   inputContainer: {
     position: 'relative',
-    marginBottom: '15px',
+    marginBottom: '20px',
   },
   icon: {
     position: 'absolute',
@@ -159,15 +178,16 @@ const styles = {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     color: '#fff',
     transition: 'all 0.3s ease',
+    letterSpacing: '0.1em',
   },
   showPasswordButton: {
     position: 'absolute',
-    right: '12px',
+    right: '15px',
     top: '50%',
     transform: 'translateY(-50%)',
     cursor: 'pointer',
     color: '#fff',
-    fontSize: '16px',
+    fontSize: '18px',
     userSelect: 'none',
     display: 'flex',
     alignItems: 'center',
@@ -183,21 +203,24 @@ const styles = {
     fontSize: '16px',
     fontWeight: '500',
     outline: 'none',
-    marginTop: '15px',
+    marginTop: '20px',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
   },
   error: {
     color: '#ff6b6b',
-    marginTop: '10px',
-    fontSize: '12px',
+    marginTop: '15px',
+    fontSize: '14px',
+    padding: '10px',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderRadius: '5px',
+    border: '1px solid #ff6b6b',
   },
   registerLink: {
-    marginTop: '20px',
+    marginTop: '25px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#fff',
-    fontSize: '14px',
   },
   registerButton: {
     marginLeft: '10px',
@@ -207,11 +230,11 @@ const styles = {
     backgroundColor: 'transparent',
     color: '#4CAF50',
     border: '2px solid #4CAF50',
-    padding: '8px 15px',
-    borderRadius: '25px',
+    padding: '10px 20px',
+    borderRadius: '30px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: '500',
     outline: 'none',
   },

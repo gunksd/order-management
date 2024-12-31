@@ -47,6 +47,27 @@ app.post('/api/login', loginUser);
 // 用户注册 API
 app.post('/api/register', registerUser);
 
+// Token刷新 API
+app.post('/api/refresh-token', (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ message: '缺少token' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const newToken = jwt.sign(
+      { userId: decoded.userId, role: decoded.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+    res.json({ token: newToken });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(401).json({ message: '无效的token' });
+  }
+});
+
 // 获取所有菜品 API
 app.get('/api/dishes', getDishes);
 
@@ -147,8 +168,6 @@ app.get('/api/orders/summary', authMiddleware(['顾客', '管理员']), async (r
   }
 });
 
-
-
 // 确保订单统计视图已创建（管理员权限）
 app.post('/api/views/create', authMiddleware(['管理员']), async (req, res) => {
   try {
@@ -172,7 +191,6 @@ app.post('/api/views/create', authMiddleware(['管理员']), async (req, res) =>
     res.status(500).json({ message: '服务器错误', error: error.message });
   }
 });
-
 
 // 更新订单统计视图 API
 app.post('/api/orders/update-summary-view', authMiddleware(['顾客', '管理员']), async (req, res) => {
@@ -223,7 +241,6 @@ app.post('/api/indexes/create', authMiddleware(['管理员']), async (req, res) 
   }
 });
 
-
 // 删除索引 API（仅限管理员）
 app.delete('/api/indexes/delete', authMiddleware(['管理员']), async (req, res) => {
   try {
@@ -250,3 +267,4 @@ app.use((err, req, res, next) => {
 // 监听端口
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+

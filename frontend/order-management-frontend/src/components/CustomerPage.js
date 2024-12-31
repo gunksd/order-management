@@ -1,20 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import { FaUtensils, FaShoppingCart, FaHistory, FaChartBar, FaTrash } from 'react-icons/fa';
 import { IoMdPricetag } from 'react-icons/io';
+import Particles from "react-tsparticles";
+import { loadFull } from "tsparticles";
+import { motion, AnimatePresence } from 'framer-motion';
 
 const styles = {
   container: {
     padding: '20px',
-    backgroundColor: '#f0f2f5',
+    backgroundColor: '#1a1a2e',
+    position: 'relative',
+    minHeight: '100vh',
+    overflow: 'hidden',
+    isolation: 'isolate',
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     padding: '20px',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
     borderRadius: '8px',
+    position: 'relative',
+    zIndex: 1,
+    backdropFilter: 'blur(10px)',
+    pointerEvents: 'auto',
   },
   header: {
     fontSize: '28px',
@@ -41,10 +52,6 @@ const styles = {
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
     borderRadius: '8px',
     transition: 'all 0.3s ease',
-    '&:hover': {
-      transform: 'translateY(-5px)',
-      boxShadow: '0 6px 12px rgba(0, 0, 0, 0.1)',
-    },
   },
   priceTag: {
     display: 'flex',
@@ -75,9 +82,6 @@ const styles = {
     transition: 'all 0.3s ease',
     fontSize: '18px',
     fontWeight: 'bold',
-    '&:hover': {
-      backgroundColor: '#2980b9',
-    },
   },
   quantityInput: {
     backgroundColor: 'transparent',
@@ -98,9 +102,6 @@ const styles = {
     transition: 'all 0.3s ease',
     outline: 'none',
     margin: '5px',
-    '&:hover': {
-      backgroundColor: '#0056b3',
-    },
   },
   cancelButton: {
     backgroundColor: '#c0392b',
@@ -112,10 +113,6 @@ const styles = {
     marginTop: '10px',
     marginLeft: '10px',
     transition: 'all 0.3s ease',
-    '&:hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    },
   },
   orderItem: {
     display: 'flex',
@@ -145,12 +142,10 @@ const styles = {
     padding: '5px 10px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-    '&:hover': {
-      backgroundColor: '#c0392b',
-    },
   },
   recommendedSection: {
     marginTop: '20px',
+    marginBottom: '40px',
     padding: '20px',
     backgroundColor: '#f8f9fa',
     borderRadius: '8px',
@@ -168,10 +163,6 @@ const styles = {
     borderRadius: '8px',
     padding: '15px',
     transition: 'all 0.3s ease',
-    '&:hover': {
-      transform: 'translateY(-5px)',
-      boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
-    },
   },
   recommendedDishName: {
     fontSize: '18px',
@@ -193,13 +184,23 @@ const styles = {
     borderRadius: '5px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-    '&:hover': {
-      backgroundColor: '#2980b9',
-    },
+  },
+  logoutButton: {
+    backgroundColor: '#e74c3c',
+    color: '#fff',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    outline: 'none',
+    position: 'absolute',
+    top: '20px',
+    right: '20px',
   },
 };
 
-function CustomerPage() {
+function CustomerPage({ onLogout }) {
   const [dishes, setDishes] = useState([]);
   const [order, setOrder] = useState([]);
   const [previousOrders, setPreviousOrders] = useState([]);
@@ -214,17 +215,21 @@ function CustomerPage() {
   const userId = localStorage.getItem('userId');
 
   useEffect(() => {
+    console.log('Current order:', order);
+  }, [order]);
+
+  useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       const decoded = jwtDecode(token);
-      console.log(decoded);
+      console.log('Decoded token:', decoded);
 
       const isExpired = decoded.exp * 1000 < Date.now();
       console.log('Token过期时间:', new Date(decoded.exp * 1000).toLocaleString());
       console.log('当前时间:', new Date(Date.now()).toLocaleString());
       console.log('Token是否过期:', isExpired);
       if (isExpired) {
-        alert('Token 已过期');
+        alert('Token 已过期，请重新登录');
         navigate('/login');
       } else {
         fetchDishes();
@@ -232,25 +237,35 @@ function CustomerPage() {
         fetchOrderSummary(token);
       }
     } else {
-      alert('请先登录');
-      navigate('/login');
+      fetchDishes(); // 即使没有 token 也获取菜品
+      setError('请先登录以查看完整功能');
     }
-  }, [navigate, sortOrder]);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (dishes.length > 0) {
+      const sortedDishes = [...dishes].sort((a, b) => {
+        return sortOrder === 'asc' ? a.price - b.price : b.price - a.price;
+      });
+      setDishes(sortedDishes);
+    }
+  }, [sortOrder, dishes]);
 
   const fetchDishes = () => {
+    console.log('Fetching dishes...');
     axios.get('http://localhost:5000/api/dishes')
       .then(response => {
-        const sortedDishes = response.data.sort((a, b) => {
-          return sortOrder === 'asc' ? a.price - b.price : b.price - a.price;
-        });
-        setDishes(sortedDishes);
+        console.log('Fetched dishes:', response.data);
+        setDishes(response.data);
       })
       .catch(error => {
         console.error('Error fetching dishes:', error);
+        setError('无法加载菜品，请稍后重试');
       });
   };
 
   const fetchPreviousOrders = (token) => {
+    console.log('Fetching previous orders...');
     setLoadingOrders(true);
     axios.get(`http://localhost:5000/api/orders?user_id=${userId}`, {
       headers: {
@@ -258,6 +273,7 @@ function CustomerPage() {
       },
     })
     .then(response => {
+      console.log('Fetched previous orders:', response.data);
       if (response.data.length === 0) {
         setPreviousOrders([]);
       } else {
@@ -275,6 +291,7 @@ function CustomerPage() {
   };
 
   const fetchOrderSummary = (token) => {
+    console.log('Fetching order summary...');
     axios.get(`http://localhost:5000/api/orders/summary`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -284,6 +301,7 @@ function CustomerPage() {
       },
     })
     .then(response => {
+      console.log('Fetched order summary:', response.data);
       setOrderSummary(response.data);
     })
     .catch(error => {
@@ -292,6 +310,7 @@ function CustomerPage() {
   };
 
   const updateDishQuantity = (dishId, quantity) => {
+    console.log(`Updating dish quantity: dishId=${dishId}, quantity=${quantity}`);
     const dish = dishes.find(d => d.dish_id === dishId);
     if (dish) {
       const newQuantity = Math.max(0, Math.min(quantity, dish.stock));
@@ -299,13 +318,15 @@ function CustomerPage() {
         const existingItem = prevOrder.find(item => item.dish_id === dishId);
         if (existingItem) {
           if (newQuantity === 0) {
-            setRecommendedDishes([]); // 清除推荐菜品
+            console.log(`Removing dish ${dishId} from order`);
             return prevOrder.filter(item => item.dish_id !== dishId);
           }
+          console.log(`Updating quantity for dish ${dishId} to ${newQuantity}`);
           return prevOrder.map(item =>
             item.dish_id === dishId ? { ...item, quantity: newQuantity } : item
           );
         } else if (newQuantity > 0) {
+          console.log(`Adding new dish ${dishId} to order with quantity ${newQuantity}`);
           return [...prevOrder, { dish_id: dishId, dish_name: dish.dish_name, price: dish.price, quantity: newQuantity, maxQuantity: dish.stock }];
         }
         return prevOrder;
@@ -317,24 +338,34 @@ function CustomerPage() {
   };
 
   const addToOrder = (dish) => {
-    const existingOrder = order.find(item => item.dish_id === dish.dish_id);
-    if (existingOrder) {
-      if (existingOrder.quantity < dish.stock) {
-        updateDishQuantity(dish.dish_id, existingOrder.quantity + 1);
+    console.log(`Adding dish to order: ${JSON.stringify(dish)}`);
+    setOrder(prevOrder => {
+      const existingOrder = prevOrder.find(item => item.dish_id === dish.dish_id);
+      if (existingOrder) {
+        if (existingOrder.quantity < dish.stock) {
+          console.log(`Increasing quantity for dish ${dish.dish_id}`);
+          return prevOrder.map(item =>
+            item.dish_id === dish.dish_id
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          );
+        }
+        console.log(`Dish ${dish.dish_id} already at max quantity`);
+        return prevOrder;
+      } else {
+        console.log(`Adding new dish ${dish.dish_id} to order`);
+        return [...prevOrder, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1, maxQuantity: dish.stock }];
       }
-    } else {
-      setOrder(prevOrder => [...prevOrder, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1, maxQuantity: dish.stock }]);
-    }
-    if (order.length > 0) { // 只有当订单中有菜品时才更新推荐
-      updateRecommendedDishes(dish);
-    }
+    });
+    updateRecommendedDishes(dish);
   };
 
   const removeFromOrder = (dishId) => {
+    console.log(`Removing dish from order: ${dishId}`);
     setOrder(prevOrder => {
       const newOrder = prevOrder.filter(item => item.dish_id !== dishId);
       if (newOrder.length === 0) {
-        setRecommendedDishes([]); // 如果订单为空，清除所有推荐
+        setRecommendedDishes([]);
       }
       return newOrder;
     });
@@ -345,6 +376,7 @@ function CustomerPage() {
   };
 
   const placeOrder = () => {
+    console.log('Placing order...');
     const token = localStorage.getItem('token');
 
     if (!userId) {
@@ -382,6 +414,7 @@ function CustomerPage() {
           });
         });
 
+        console.log(`Order placed successfully. Navigating to payment page for order ${orderId}`);
         navigate(`/payment/${orderId}`);
         fetchOrderSummary(token);
         fetchPreviousOrders(token);
@@ -396,6 +429,7 @@ function CustomerPage() {
 
   const deleteOrder = (orderId) => {
     if (window.confirm('确定要删除这个订单吗？')) {
+      console.log(`Deleting order: ${orderId}`);
       const token = localStorage.getItem('token');
       axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
         headers: {
@@ -403,6 +437,7 @@ function CustomerPage() {
         },
       })
       .then(() => {
+        console.log(`Order ${orderId} deleted successfully`);
         const updatedOrders = previousOrders.filter(order => order.order_id !== orderId);
         setPreviousOrders(updatedOrders);
         if (updatedOrders.length === 0) {
@@ -420,7 +455,7 @@ function CustomerPage() {
   };
 
   const updateRecommendedDishes = (addedDish) => {
-    // 推荐价格相近（±10%）的其他菜品
+    console.log(`Updating recommended dishes based on: ${JSON.stringify(addedDish)}`);
     const priceLowerBound = addedDish.price * 0.9;
     const priceUpperBound = addedDish.price * 1.1;
     
@@ -428,107 +463,307 @@ function CustomerPage() {
       dish.dish_id !== addedDish.dish_id &&
       dish.price >= priceLowerBound &&
       dish.price <= priceUpperBound
-    ).slice(0, 3);  // 最多推荐3个菜品
+    ).slice(0, 3);
 
-    console.log('Recommended dishes:', recommended); // 添加日志
+    console.log('Recommended dishes:', recommended);
     setRecommendedDishes(recommended);
   };
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.header}>欢迎使用点菜系统，{username || '顾客'}</h1>
+  const particlesInit = useCallback(async (engine) => {
+    await loadFull(engine);
+  }, []);
 
-        <div style={styles.section}>
+  const particlesOptions = {
+    particles: {
+      number: {
+        value: 80,
+        density: {
+          enable: true,
+          value_area: 800
+        }
+      },
+      color: {
+        value: "#ffffff"
+      },
+      shape: {
+        type: "circle",
+      },
+      opacity: {
+        value: 0.5,
+        random: true,
+      },
+      size: {
+        value: 3,
+        random: true,
+      },
+      move: {
+        enable: true,
+        speed: 1,
+        direction: "none",
+        random: false,
+        straight: false,
+        out_mode: "out",
+        bounce: false,
+      },
+    },
+    interactivity: {
+      detect_on: "canvas",
+      events: {
+        onhover: {
+          enable: true,
+          mode: "repulse"
+        },
+        onclick: {
+          enable: true,
+          mode: "push"
+        }
+      },
+      modes: {
+        repulse: {
+          distance: 100,
+          duration: 0.4
+        },
+        push: {
+          particles_nb: 4
+        }
+      }
+    },
+    retina_detect: true
+  };
+
+  // Framer Motion variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { 
+        duration: 0.5,
+        when: "beforeChildren",
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: { type: 'spring', stiffness: 300, damping: 24 }
+    }
+  };
+
+  const buttonVariants = {
+    hover: { scale: 1.05 },
+    tap: { scale: 0.95 }
+  };
+
+  return (
+    <motion.div 
+      style={styles.container}
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <Particles id="tsparticles" init={particlesInit} options={particlesOptions} style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1}} />
+      <motion.div style={styles.card} variants={itemVariants}>
+        <motion.h1 style={styles.header} variants={itemVariants}>欢迎使用点菜系统，{username || '顾客'}</motion.h1>
+        <motion.button
+          onClick={onLogout}
+          style={styles.logoutButton}
+          variants={buttonVariants}
+          whileHover="hover"
+          whileTap="tap"
+        >
+          登出
+        </motion.button>
+
+        <motion.div style={styles.section} variants={itemVariants}>
           <h2 style={styles.subHeader}>
             <FaUtensils style={styles.icon} />
             菜品列表
           </h2>
-          <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} style={styles.button}>
+          <motion.button
+            type="button"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            style={styles.button}
+            variants={buttonVariants}
+            whileHover="hover"
+            whileTap="tap"
+          >
             {sortOrder === 'asc' ? '按价格降序排序' : '按价格升序排序'}
-          </button>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-            {dishes.map(dish => (
-              <div key={dish.dish_id} style={styles.dishCard}>
-                <h3>{dish.dish_name}</h3>
-                <p style={styles.priceTag}>
-                  <IoMdPricetag style={styles.icon} />
-                  价格: ¥{dish.price}
-                </p>
-                <p>库存: {dish.stock}</p>
-                <div style={styles.quantityControl}>
-                  <button
-                    style={styles.quantityButton}
-                    onClick={() => updateDishQuantity(dish.dish_id, (order.find(item => item.dish_id === dish.dish_id)?.quantity || 0) - 1)}
+          </motion.button>
+          <motion.div 
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}
+            variants={itemVariants}
+          >
+            <AnimatePresence>
+              {dishes.map(dish => (
+                <motion.div
+                  key={dish.dish_id}
+                  style={styles.dishCard}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  layout
+                >
+                  <h3>{dish.dish_name}</h3>
+                  <p style={styles.priceTag}>
+                    <IoMdPricetag style={styles.icon} />
+                    价格: ¥{dish.price}
+                  </p>
+                  <p>库存: {dish.stock}</p>
+                  <div style={styles.quantityControl}>
+                    <motion.button
+                      type="button"
+                      style={styles.quantityButton}
+                      onClick={() => updateDishQuantity(dish.dish_id, (order.find(item => item.dish_id === dish.dish_id)?.quantity || 0) - 1)}
+                      variants={buttonVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      -
+                    </motion.button>
+                    <input
+                      type="number"
+                      value={order.find(item => item.dish_id === dish.dish_id)?.quantity || 0}
+                      readOnly
+                      style={styles.quantityInput}
+                    />
+                    <motion.button
+                      type="button"
+                      style={styles.quantityButton}
+                      onClick={() => updateDishQuantity(dish.dish_id, (order.find(item => item.dish_id === dish.dish_id)?.quantity || 0) + 1)}
+                      disabled={dish.stock === 0}
+                      variants={buttonVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      +
+                    </motion.button>
+                  </div>
+                  <motion.button
+                    type="button"
+                    onClick={() => addToOrder(dish)}
+                    style={styles.button}
+                    variants={buttonVariants}
+                    whileHover="hover"
+                    whileTap="tap"
                   >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    value={order.find(item => item.dish_id === dish.dish_id)?.quantity || 0}
-                    readOnly
-                    style={styles.quantityInput}
-                  />
-                  <button
-                    style={styles.quantityButton}
-                    onClick={() => updateDishQuantity(dish.dish_id, (order.find(item => item.dish_id === dish.dish_id)?.quantity || 0) + 1)}
-                    disabled={dish.stock === 0}
+                    添加到订单
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={() => removeFromOrder(dish.dish_id)}
+                    style={styles.cancelButton}
+                    variants={buttonVariants}
+                    whileHover="hover"
+                    whileTap="tap"
                   >
-                    +
-                  </button>
-                </div>
-                <button onClick={() => addToOrder(dish)} style={styles.button}>添加到订单</button>
-                <button onClick={() => removeFromOrder(dish.dish_id)} style={styles.cancelButton}>取消添加</button>
-              </div>
-            ))}
-          </div>
-        </div>
+                    取消添加
+                  </motion.button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
 
-        <div style={styles.recommendedSection}>
+        <motion.div style={styles.recommendedSection} variants={itemVariants}>
           <h2 style={styles.recommendedHeader}>
             <FaUtensils style={styles.icon} />
             推荐菜品
           </h2>
           {recommendedDishes.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-              {recommendedDishes.map(dish => (
-                <div key={dish.dish_id} style={styles.recommendedDishCard}>
-                  <h3 style={styles.recommendedDishName}>{dish.dish_name}</h3>
-                  <p style={styles.recommendedPriceTag}>
-                    <IoMdPricetag style={styles.icon} />
-                    价格: ¥{dish.price}
-                  </p>
-                  <p>库存: {dish.stock}</p>
-                  <button onClick={() => addToOrder(dish)} style={styles.recommendedButton}>添加到订单</button>
-                </div>
-              ))}
-            </div>
+            <motion.div 
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}
+              variants={itemVariants}
+            >
+              <AnimatePresence>
+                {recommendedDishes.map(dish => (
+                  <motion.div
+                    key={dish.dish_id}
+                    style={styles.recommendedDishCard}
+                    variants={itemVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="hidden"
+                    layout
+                  >
+                    <h3 style={styles.recommendedDishName}>{dish.dish_name}</h3>
+                    <p style={styles.recommendedPriceTag}>
+                      <IoMdPricetag style={styles.icon} />
+                      价格: ¥{dish.price}
+                    </p>
+                    <p>库存: {dish.stock}</p>
+                    <motion.button
+                      type="button"
+                      onClick={() => addToOrder(dish)}
+                      style={styles.recommendedButton}
+                      variants={buttonVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      添加到订单
+                    </motion.button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
           ) : (
             <p>暂无推荐菜品</p>
           )}
-        </div>
+        </motion.div>
 
-        {order.length > 0 && (
-          <div style={styles.section}>
-            <h2 style={styles.subHeader}>
-              <FaShoppingCart style={styles.icon} />
-              我的订单
-            </h2>
-            <ul>
-              {order.map((dish, index) => (
-                <li key={index} style={styles.orderItem}>
-                  <span>{dish.dish_name}</span>
-                  <span>¥{dish.price} x {dish.quantity}</span>
-                </li>
-              ))}
-            </ul>
-            <h3 style={styles.totalAmount}>总金额: ¥{calculateTotal()}</h3>
-            <button onClick={placeOrder} style={styles.button}>提交订单</button>
-          </div>
-        )}
+        <AnimatePresence>
+          {order.length > 0 && (
+            <motion.div
+              style={styles.section}
+              variants={itemVariants}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+            >
+              <h2 style={styles.subHeader}>
+                <FaShoppingCart style={styles.icon} />
+                我的订单
+              </h2>
+              <ul>
+                <AnimatePresence>
+                  {order.map((dish, index) => (
+                    <motion.li
+                      key={index}
+                      style={styles.orderItem}
+                      variants={itemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                      layout
+                    >
+                      <span>{dish.dish_name}</span>
+                      <span>¥{dish.price} x {dish.quantity}</span>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+              <motion.h3 style={styles.totalAmount} variants={itemVariants}>
+                总金额: ¥{calculateTotal()}
+              </motion.h3>
+              <motion.button
+                type="button"
+                onClick={placeOrder}
+                style={styles.button}
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
+              >
+                提交订单
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-
-        <div style={styles.section}>
+        <motion.div style={styles.section} variants={itemVariants}>
           <h2 style={styles.subHeader}>
             <FaHistory style={styles.icon} />
             历史订单
@@ -541,30 +776,47 @@ function CustomerPage() {
             <div>历史订单为空</div>
           ) : (
             <ul>
-              {previousOrders.map((order) => {
-                const formattedTime = order.created_at
-                  .replace('T', ' ')
-                  .replace('Z', '')
-                  .replace(/\.\d+/, '')
-                  .replace(/-/g, '年')
-                  .replace(/(\d{4}年\d{2})/, '$1月')
-                  .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1日 $2时$3分$4秒');
-                return (
-                  <li key={order.order_id} style={styles.historyItem}>
-                    <span>
-                      订单号: {order.order_id}, 金额: ¥{order.total_amount}, 创建时间: {formattedTime}
-                    </span>
-                    <button onClick={() => deleteOrder(order.order_id)} style={styles.deleteButton}>
-                      <FaTrash />
-                    </button>
-                  </li>
-                );
-              })}
+              <AnimatePresence>
+                {previousOrders.map((order) => {
+                  const formattedTime = order.created_at
+                    .replace('T', ' ')
+                    .replace('Z', '')
+                    .replace(/\.\d+/, '')
+                    .replace(/-/g, '年')
+                    .replace(/(\d{4}年\d{2})/, '$1月')
+                    .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1日 $2时$3分$4秒');
+                  return (
+                    <motion.li
+                      key={order.order_id}
+                      style={styles.historyItem}
+                      variants={itemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                      layout
+                    >
+                      <span>
+                        订单号: {order.order_id}, 金额: ¥{order.total_amount}, 创建时间: {formattedTime}
+                      </span>
+                      <motion.button
+                        type="button"
+                        onClick={() => deleteOrder(order.order_id)}
+                        style={styles.deleteButton}
+                        variants={buttonVariants}
+                        whileHover="hover"
+                        whileTap="tap"
+                      >
+                        <FaTrash />
+                      </motion.button>
+                    </motion.li>
+                  );
+                })}
+              </AnimatePresence>
             </ul>
           )}
-        </div>
+        </motion.div>
 
-        <div style={styles.section}>
+        <motion.div style={styles.section} variants={itemVariants}>
           <h2 style={styles.subHeader}>
             <FaChartBar style={styles.icon} />
             订单统计信息
@@ -573,16 +825,26 @@ function CustomerPage() {
             <div>暂无订单统计信息</div>
           ) : (
             <ul>
-              {orderSummary.map((summary, index) => (
-                <li key={index} style={styles.historyItem}>
-                  用户 ID: {summary.username}, 订单数: {summary.order_count}, 总消费: ¥{summary.total_spent.toFixed(2)}
-                </li>
-              ))}
+              <AnimatePresence>
+                {orderSummary.map((summary, index) => (
+                  <motion.li
+                    key={index}
+                    style={styles.historyItem}
+                    variants={itemVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="hidden"
+                    layout
+                  >
+                    用户 ID: {summary.username}, 订单数: {summary.order_count}, 总消费: ¥{summary.total_spent.toFixed(2)}
+                  </motion.li>
+                ))}
+              </AnimatePresence>
             </ul>
           )}
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }
 

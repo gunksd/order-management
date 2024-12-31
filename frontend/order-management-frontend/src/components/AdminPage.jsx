@@ -1,28 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Lottie from 'lottie-react';
 import successAnimation from '../assets/dish-added-success.json';
 import { FaSearch, FaPlus, FaEdit, FaTrash, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import EditDishModal from './ EditDishModal';
 
-function AdminPage() {
+function AdminPage({ onLogout }) {
   const [dishes, setDishes] = useState([]);
   const [filteredDishes, setFilteredDishes] = useState([]);
-  const [dishName, setDishName] = useState('');
-  const [price, setPrice] = useState('');
-  const [stock, setStock] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [editDishId, setEditDishId] = useState(null);
   const [orders, setOrders] = useState([]);
   const [orderError, setOrderError] = useState(null);
-  const [searchActive, setSearchActive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const ordersPerPage = 5;
   const [orderSummary, setOrderSummary] = useState([]);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [activeTab, setActiveTab] = useState('dishes');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingDish, setEditingDish] = useState(null);
+
+  const ordersPerPage = 5;
 
   useEffect(() => {
     fetchDishes();
@@ -33,12 +31,9 @@ function AdminPage() {
 
   const fetchDishes = async () => {
     const token = localStorage.getItem('token');
-    console.log('Using token to fetch dishes:', token);
     try {
       const response = await axios.get('http://localhost:5000/api/dishes', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setDishes(response.data);
       setFilteredDishes(response.data);
@@ -50,12 +45,9 @@ function AdminPage() {
 
   const fetchOrders = async () => {
     const token = localStorage.getItem('token');
-    console.log('Using token to fetch orders:', token);
     try {
       const response = await axios.get('http://localhost:5000/api/orders', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(response.data);
       setOrderError(null);
@@ -66,14 +58,10 @@ function AdminPage() {
 
   const ensureOrderSummaryView = async () => {
     const token = localStorage.getItem('token');
-    console.log('Ensuring UserOrderSummary view:', token);
     try {
       await axios.post('http://localhost:5000/api/views/create', {}, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('UserOrderSummary view created or already exists');
     } catch (error) {
       console.error('Error ensuring UserOrderSummary view:', error);
       handleAuthError(error, '无法创建视图，请稍后重试。');
@@ -83,57 +71,34 @@ function AdminPage() {
   const fetchOrderSummary = async () => {
     const token = localStorage.getItem('token');
     try {
-      console.log('Fetching order summary...');
       const response = await axios.get('http://localhost:5000/api/orders/summary', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Order summary response:', response.data);
       setOrderSummary(response.data);
     } catch (error) {
-      console.error('Error fetching order summary:', error);
       handleAuthError(error, '无法获取订单统计信息，请稍后重试。');
     }
   };
 
   const handleAuthError = (error, fallbackMessage) => {
-    if (error.response) {
-      console.error('Error response:', error.response);
-      if (error.response.status === 401) {
-        setError('未授权访问，请重新登录。');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      } else {
-        setError(fallbackMessage);
-      }
-    } else if (error.request) {
-      console.error('Error request (no response received):', error.request);
-      setError('无法连接到服务器，请检查网络连接。');
+    if (error.response && error.response.status === 401) {
+      setError('未授权访问，请重新登录。');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
     } else {
-      console.error('Error setting up request:', error.message);
       setError(fallbackMessage);
     }
   };
 
   const handleConfirmPayment = async (orderId) => {
+    const token = localStorage.getItem('token');
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('未找到用户令牌，请重新登录。');
-      }
-
       const response = await axios.put(
         `http://localhost:5000/api/orders/confirm-payment`,
         { orderId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
       if (response.status === 200) {
         alert('支付状态更新成功');
         fetchOrders();
@@ -148,13 +113,10 @@ function AdminPage() {
 
   const handleCancelOrder = async (orderId) => {
     if (window.confirm('确定要取消这个订单吗？')) {
+      const token = localStorage.getItem('token');
       try {
-        const token = localStorage.getItem('token');
-        console.log('Using token to cancel order:', token);
         await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
         alert('订单取消成功');
         fetchOrders();
@@ -168,7 +130,6 @@ function AdminPage() {
   const handleSearch = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
-
     if (value === '') {
       setFilteredDishes(dishes);
     } else {
@@ -179,52 +140,22 @@ function AdminPage() {
     }
   };
 
-  const handleAddDish = async () => {
-    if (!dishName || price <= 0 || stock <= 0) {
-      setError('请输入有效的菜品信息。');
-      return;
-    }
+  const handleAddDish = () => {
+    setEditingDish(null);
+    setIsEditModalOpen(true);
+  };
 
-    try {
-      const token = localStorage.getItem('token');
-      console.log('Using token to add dish:', token);
-      await axios.post(
-        'http://localhost:5000/api/dishes',
-        {
-          dish_name: dishName,
-          price: parseFloat(price),
-          stock: parseInt(stock),
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      setDishName('');
-      setPrice('');
-      setStock('');
-      setError(null);
-      setShowSuccessAnimation(true);
-      setTimeout(() => {
-        setShowSuccessAnimation(false);
-      }, 2000);
-      fetchDishes();
-    } catch (error) {
-      console.error('Error adding dish:', error);
-      handleAuthError(error, '添加菜品失败，请检查输入信息。');
-    }
+  const handleEditDish = (dish) => {
+    setEditingDish(dish);
+    setIsEditModalOpen(true);
   };
 
   const handleDeleteDish = async (dishId) => {
     if (window.confirm('确定要删除这个菜品吗？')) {
+      const token = localStorage.getItem('token');
       try {
-        const token = localStorage.getItem('token');
-        console.log('Using token to delete dish:', token);
         await axios.delete(`http://localhost:5000/api/dishes/${dishId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
         alert('菜品删除成功');
         fetchDishes();
@@ -235,54 +166,37 @@ function AdminPage() {
     }
   };
 
-  const handleEditDish = (dish) => {
-    setDishName(dish.dish_name);
-    setPrice(dish.price);
-    setStock(dish.stock);
-    setEditMode(true);
-    setEditDishId(dish.dish_id);
-  };
-
-  const handleUpdateDish = async () => {
-    if (!dishName || price <= 0 || stock <= 0) {
-      setError('请输入有效的菜品信息。');
-      return;
-    }
-
+  const handleSaveDish = async (dish) => {
+    const token = localStorage.getItem('token');
     try {
-      const token = localStorage.getItem('token');
-      console.log('Using token to update dish:', token);
-      await axios.put(
-        `http://localhost:5000/api/dishes/${editDishId}`,
-        {
-          dish_name: dishName,
-          price: parseFloat(price),
-          stock: parseInt(stock),
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      setDishName('');
-      setPrice('');
-      setStock('');
-      setEditMode(false);
-      setEditDishId(null);
-      setError(null);
-      alert('菜品更新成功');
+      if (dish.dish_id) {
+        await axios.put(
+          `http://localhost:5000/api/dishes/${dish.dish_id}`,
+          dish,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        await axios.post(
+          'http://localhost:5000/api/dishes',
+          dish,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+      setShowSuccessAnimation(true);
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+      }, 2000);
       fetchDishes();
+      setIsEditModalOpen(false);
     } catch (error) {
-      console.error('Error updating dish:', error);
-      handleAuthError(error, '更新菜品失败，请检查输入信息。');
+      console.error('Error saving dish:', error);
+      handleAuthError(error, '保存菜品失败，请检查输入信息。');
     }
   };
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const currentOrders = orders.slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage);
-
 
   return (
     <div style={styles.container}>
@@ -301,6 +215,14 @@ function AdminPage() {
         transition={{ duration: 0.5 }}
         style={styles.card}
       >
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onLogout}
+          style={styles.logoutButton}
+        >
+          登出
+        </motion.button>
         <h2 style={styles.header}>管理员控制台</h2>
         <div style={styles.tabContainer}>
           <button
@@ -343,38 +265,14 @@ function AdminPage() {
                 />
               </div>
 
-              <div style={styles.form}>
-                <h3 style={styles.subHeader}>{editMode ? '编辑菜品' : '添加新菜品'}</h3>
-                <input
-                  type="text"
-                  placeholder="菜品名称"
-                  value={dishName}
-                  onChange={(e) => setDishName(e.target.value)}
-                  style={styles.input}
-                />
-                <input
-                  type="number"
-                  placeholder="价格"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  style={styles.input}
-                />
-                <input
-                  type="number"
-                  placeholder="库存"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  style={styles.input}
-                />
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={editMode ? handleUpdateDish : handleAddDish}
-                  style={styles.button}
-                >
-                  {editMode ? <FaEdit /> : <FaPlus />} {editMode ? '更新菜品' : '添加菜品'}
-                </motion.button>
-              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleAddDish}
+                style={styles.addButton}
+              >
+                <FaPlus /> 添加新菜品
+              </motion.button>
 
               {error && <div style={styles.error}>{error}</div>}
 
@@ -533,6 +431,12 @@ function AdminPage() {
           )}
         </AnimatePresence>
       </motion.div>
+      <EditDishModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveDish}
+        dish={editingDish}
+      />
     </div>
   );
 }
@@ -612,18 +516,7 @@ const styles = {
     fontSize: '20px',
     fontWeight: 'bold',
   },
-  form: {
-    marginBottom: '20px',
-  },
-  input: {
-    marginBottom: '10px',
-    padding: '10px',
-    width: '100%',
-    borderRadius: '5px',
-    border: '1px solid #d9d9d9',
-    fontSize: '16px',
-  },
-  button: {
+  addButton: {
     backgroundColor: '#1890ff',
     color: '#fff',
     border: 'none',
@@ -637,6 +530,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '5px',
+    marginBottom: '20px',
   },
   error: {
     color: '#ff4d4f',
@@ -818,6 +712,19 @@ const styles = {
   successAnimation: {
     width: '300px',
     height: '300px',
+  },
+  logoutButton: {
+    position: 'absolute',
+    top: '20px',
+    right: '20px',
+    backgroundColor: '#ff4d4f',
+    color: '#fff',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    fontSize: '16px',
   },
 };
 
