@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Lottie from 'lottie-react';
@@ -14,6 +14,7 @@ function PaymentPage() {
   const [error, setError] = useState(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const audioRef = useRef(new Audio('/sounds/payment-success.mp3'));
 
   useEffect(() => {
     const initiatePayment = async () => {
@@ -85,6 +86,8 @@ function PaymentPage() {
 
   const handlePaymentSuccess = () => {
     setShowSuccessAnimation(true);
+    audioRef.current.volume = 1; // Set volume to maximum
+    audioRef.current.play().catch(error => console.error('Error playing audio:', error));
     setTimeout(() => {
       navigate('/customer');
     }, 2000);
