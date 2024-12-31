@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
-import { FaUtensils, FaShoppingCart, FaHistory, FaChartBar, FaTrash, FaSort } from 'react-icons/fa';
+import { FaUtensils, FaShoppingCart, FaHistory, FaChartBar, FaTrash, FaSort, FaMoneyBillWave, FaCheck } from 'react-icons/fa';
 import { IoMdPricetag } from 'react-icons/io';
 import Particles from "react-tsparticles";
 import { loadFull } from "tsparticles";
@@ -226,6 +226,74 @@ const styles = {
     marginLeft: '10px',
     color: '#ffffff',
   },
+  checkbox: {
+    appearance: 'none',
+    width: '20px',
+    height: '20px',
+    borderRadius: '4px',
+    border: '2px solid #3498db',
+    outline: 'none',
+    cursor: 'pointer',
+    marginRight: '10px',
+    position: 'relative',
+    transition: 'all 0.3s ease',
+  },
+  checkedCheckbox: {
+    backgroundColor: '#2ecc71',
+    border: '2px solid #2ecc71',
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%) rotate(45deg)',
+      width: '5px',
+      height: '10px',
+      border: 'solid white',
+      borderWidth: '0 2px 2px 0',
+    },
+  },
+  batchPayButton: {
+    backgroundColor: '#2ecc71',
+    color: '#fff',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    marginRight: '10px',
+    marginBottom: '20px',
+    fontSize: '14px',
+  },
+  batchDeleteButton: {
+    backgroundColor: '#e74c3c',
+    color: '#fff',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    marginRight: '10px',
+    marginBottom: '20px',
+    fontSize: '14px',
+  },
+  pendingPaymentButton: {
+    backgroundColor: '#f39c12',
+    color: '#fff',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    marginRight: '10px',
+  },
+  paidLabel: {
+    backgroundColor: '#2ecc71',
+    color: '#fff',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    marginRight: '10px',
+  },
 };
 
 function CustomerPage({ onLogout }) {
@@ -237,6 +305,7 @@ function CustomerPage({ onLogout }) {
   const [sortOrder, setSortOrder] = useState('asc');
   const [orderSummary, setOrderSummary] = useState([]);
   const [recommendedDishes, setRecommendedDishes] = useState([]);
+  const [selectedOrders, setSelectedOrders] = useState([]);
   const navigate = useNavigate();
 
   const updateRecommendedDishes = useCallback((addedDish) => {
@@ -258,7 +327,6 @@ function CustomerPage({ onLogout }) {
       setRecommendedDishes(recommended);
     }
   }, [dishes, order]);
-
 
   const username = localStorage.getItem('username');
   const userId = localStorage.getItem('userId');
@@ -286,7 +354,7 @@ function CustomerPage({ onLogout }) {
         fetchOrderSummary(token);
       }
     } else {
-      fetchDishes(); // 即使没有 token 也获取菜品
+      fetchDishes();
       setError('请先登录以查看完整功能');
     }
   }, [navigate]);
@@ -510,6 +578,63 @@ function CustomerPage({ onLogout }) {
     }
   };
 
+  const handleOrderSelect = (orderId) => {
+    setSelectedOrders(prevSelected => 
+      prevSelected.includes(orderId)
+        ? prevSelected.filter(id => id !== orderId)
+        : [...prevSelected, orderId]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (window.confirm(`确定要删除选中的 ${selectedOrders.length} 个订单吗？`)) {
+      const token = localStorage.getItem('token');
+      const deletePromises = selectedOrders.map(orderId =>
+        axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      );
+
+      Promise.all(deletePromises)
+        .then(() => {
+          const updatedOrders = previousOrders.filter(order => !selectedOrders.includes(order.order_id));
+          setPreviousOrders(updatedOrders);
+          setSelectedOrders([]);
+          if (updatedOrders.length === 0) {
+            setError('历史订单为空');
+          } else {
+            setError(null);
+          }
+          alert('选中的订单已全部删除');
+        })
+        .catch(error => {
+          console.error('Error deleting orders:', error);
+          alert('删除订单失败，请稍后重试。');
+        });
+    }
+  };
+
+  const handleBatchPayment = () => {
+    const pendingOrders = selectedOrders.filter(orderId => 
+      previousOrders.find(order => order.order_id === orderId && order.status === 'pending')
+    );
+
+    if (pendingOrders.length === 0) {
+      alert('没有选中待支付的订单');
+      return;
+    }
+
+    const totalAmount = pendingOrders.reduce((total, orderId) => {
+      const order = previousOrders.find(o => o.order_id === orderId);
+      return total + parseFloat(order.total_amount);
+    }, 0);
+
+    navigate(`/payment/batch`, { state: { orderIds: pendingOrders, totalAmount } });
+  };
+
+  const handleSinglePayment = (orderId) => {
+    navigate(`/payment/${orderId}`);
+  };
 
   const particlesInit = useCallback(async (engine) => {
     await loadFull(engine);
@@ -820,16 +945,43 @@ function CustomerPage({ onLogout }) {
           ) : previousOrders.length === 0 ? (
             <div>历史订单为空</div>
           ) : (
-            <ul>
-              <AnimatePresence>
-                {previousOrders.map((order) => {
-                  const formattedTime = order.created_at
-                    .replace('T', ' ')
-                    .replace('Z', '')
-                    .replace(/\.\d+/, '')
-                    .replace(/-/g, '年')
-                    .replace(/(\d{4}年\d{2})/, '$1月')
-                    .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1日 $2时$3分$4秒');
+            <>
+              <div>
+                {selectedOrders.length > 0 && (
+                  <>
+                    <motion.button
+                      type="button"
+                      onClick={handleBatchPayment}
+                      style={styles.batchPayButton}
+                      variants={buttonVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      批量支付
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      onClick={handleBatchDelete}
+                      style={styles.batchDeleteButton}
+                      variants={buttonVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                    >
+                      批量删除 ({selectedOrders.length})
+                    </motion.button>
+                  </>
+                )}
+              </div>
+              <ul>
+                <AnimatePresence>
+                  {previousOrders.map((order) => {
+                    const formattedTime = order.created_at
+                      .replace('T', ' ')
+                      .replace('Z', '')
+                      .replace(/\.\d+/, '')
+                      .replace(/-/g, '年')
+                      .replace(/(\d{4}年\d{2})/, '$1月')
+                      .replace(/(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1日 $2时$3分$4秒');
                   return (
                     <motion.li
                       key={order.order_id}
@@ -840,26 +992,53 @@ function CustomerPage({ onLogout }) {
                       exit="hidden"
                       layout
                     >
-                      <span>
+                      <span style={{ display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedOrders.includes(order.order_id)}
+                          onChange={() => handleOrderSelect(order.order_id)}
+                          style={{
+                            ...styles.checkbox,
+                            ...(selectedOrders.includes(order.order_id) ? styles.checkedCheckbox : {}),
+                          }}
+                        />
                         订单号: {order.order_id}, 金额: ¥{order.total_amount}, 创建时间: {formattedTime}
                       </span>
-                      <motion.button
-                        type="button"
-                        onClick={() => deleteOrder(order.order_id)}
-                        style={styles.deleteButton}
-                        variants={buttonVariants}
-                        whileHover="hover"
-                        whileTap="tap"
-                      >
-                        <FaTrash />
-                      </motion.button>
+                      <div>
+                        {order.status === 'pending' ? (
+                          <motion.button
+                            type="button"
+                            onClick={() => handleSinglePayment(order.order_id)}
+                            style={styles.pendingPaymentButton}
+                            variants={buttonVariants}
+                            whileHover="hover"
+                            whileTap="tap"
+                          >
+                            <FaMoneyBillWave style={{ marginRight: '5px' }} />
+                            待支付
+                          </motion.button>
+                        ) : (
+                          <span style={styles.paidLabel}>已支付</span>
+                        )}
+                        <motion.button
+                          type="button"
+                          onClick={() => deleteOrder(order.order_id)}
+                          style={styles.deleteButton}
+                          variants={buttonVariants}
+                          whileHover="hover"
+                          whileTap="tap"
+                        >
+                          <FaTrash />
+                        </motion.button>
+                      </div>
                     </motion.li>
                   );
                 })}
               </AnimatePresence>
             </ul>
-          )}
-        </motion.div>
+          </>
+        )}
+      </motion.div>
 
         <motion.div style={styles.section} variants={itemVariants}>
           <h2 style={styles.subHeader}>

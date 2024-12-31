@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
 import Lottie from 'lottie-react';
 import successAnimation from '../assets/dish-added-success.json';
 import { FaSearch, FaPlus, FaEdit, FaTrash, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
@@ -20,6 +22,9 @@ function AdminPage({ onLogout }) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDish, setEditingDish] = useState(null);
 
+  const audioRef = useRef(new Audio('/sounds/payment-success.mp3'));
+
+  const navigate = useNavigate();
   const ordersPerPage = 5;
 
   useEffect(() => {
@@ -63,7 +68,7 @@ function AdminPage({ onLogout }) {
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (error) {
-      console.error('Error ensuring UserOrderSummary view:', error);
+      console.error('创建 UserOrderSummary 视图时出错:', error);
       handleAuthError(error, '无法创建视图，请稍后重试。');
     }
   };
@@ -106,7 +111,7 @@ function AdminPage({ onLogout }) {
         alert('支付状态更新失败，请稍后重试。');
       }
     } catch (error) {
-      console.error('Error confirming payment:', error);
+      console.error('确认支付时出错:', error);
       setOrderError('支付确认失败，请稍后重试。');
     }
   };
@@ -121,7 +126,7 @@ function AdminPage({ onLogout }) {
         alert('订单取消成功');
         fetchOrders();
       } catch (error) {
-        console.error('Error cancelling order:', error);
+        console.error('取消订单时出错:', error);
         setOrderError('取消订单失败，请稍后重试。');
       }
     }
@@ -160,7 +165,7 @@ function AdminPage({ onLogout }) {
         alert('菜品删除成功');
         fetchDishes();
       } catch (error) {
-        console.error('Error deleting dish:', error);
+        console.error('删除菜品时出错:', error);
         handleAuthError(error, '删除菜品失败，请稍后重试。');
       }
     }
@@ -183,13 +188,14 @@ function AdminPage({ onLogout }) {
         );
       }
       setShowSuccessAnimation(true);
+      audioRef.current.play();
       setTimeout(() => {
         setShowSuccessAnimation(false);
       }, 2000);
       fetchDishes();
       setIsEditModalOpen(false);
     } catch (error) {
-      console.error('Error saving dish:', error);
+      console.error('保存菜品时出错:', error);
       handleAuthError(error, '保存菜品失败，请检查输入信息。');
     }
   };

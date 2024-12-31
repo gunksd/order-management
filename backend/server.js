@@ -9,7 +9,7 @@ require('dotenv').config();
 const { loginUser, registerUser } = require('./controllers/userController');
 const { getDishes, addDish, deleteDish, updateDish, updateDishSales } = require('./controllers/dishController');
 const { placeOrder, getUserOrders, deleteOrder, getOrderSummary } = require('./controllers/orderController');
-const { generatePaymentLink, handlePaymentSuccess } = require('./controllers/paymentController');
+const { generatePaymentLink, generateBatchPaymentLink, handlePaymentSuccess } = require('./controllers/paymentController');
 const { authMiddleware } = require('./middlewares/authMiddleware');
 
 // 创建 Express 应用实例
@@ -91,6 +91,43 @@ app.post('/api/orders', authMiddleware(['顾客']), placeOrder);
 
 // 生成支付链接 API（仅限顾客）
 app.post('/api/payment/generate', authMiddleware(['顾客']), generatePaymentLink);
+
+// 生成批量支付链接 API（仅限顾客）
+app.post('/api/payment/generate-batch', authMiddleware(['顾客']), async (req, res) => {
+  const { orderIds } = req.body;
+  
+  if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+    return res.status(400).json({ message: '无效的请求参数' });
+  }
+
+  try {
+    // 连接到数据库以获取订单总金额
+    const pool = await sql.connect();
+    const orderIdsString = orderIds.join(',');
+    const result = await pool.request()
+      .input('order_ids', sql.VarChar(8000), orderIdsString)
+      .query(`
+        SELECT SUM(total_amount) AS total_amount 
+        FROM [order] 
+        WHERE order_id IN (SELECT value FROM STRING_SPLIT(@order_ids, ','))
+      `);
+
+    if (result.recordset.length === 0 || result.recordset[0].total_amount === null) {
+      return res.status(404).json({ message: '未找到有效订单' });
+    }
+
+    const totalAmount = result.recordset[0].total_amount;
+
+    // 使用固定的支付宝个人收款码链接
+    const payUrl = 'https://raw.githubusercontent.com/gunksd/img/refs/heads/main/pay.jpg';
+    const instruction = "请使用支付宝扫描以下二维码进行批量支付，完成后再返回页面确认支付。";
+
+    res.json({ payUrl, amount: totalAmount, instruction });
+  } catch (error) {
+    console.error('Error generating batch payment link:', error);
+    res.status(500).json({ message: '生成支付链接时出错', error: error.message });
+  }
+});
 
 // 支付成功确认 API（仅限管理员）
 app.post('/api/payment/confirm', authMiddleware(['管理员']), handlePaymentSuccess);

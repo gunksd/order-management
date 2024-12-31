@@ -1,20 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import Lottie from 'lottie-react';
-import { FaQrcode, FaMoneyBillWave, FaInfoCircle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaQrcode, FaMoneyBillWave, FaInfoCircle, FaCheckCircle, FaTimesCircle, FaList } from 'react-icons/fa';
 import successAnimation from '../assets/payment-success.json';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function PaymentPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [paymentLink, setPaymentLink] = useState(null);
   const [amount, setAmount] = useState(null);
   const [error, setError] = useState(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const audioRef = useRef(new Audio('/sounds/payment-success.mp3'));
+  const [orderIds, setOrderIds] = useState([]);
+  const [isBatchPayment, setIsBatchPayment] = useState(false);
 
   useEffect(() => {
     const initiatePayment = async () => {
@@ -25,19 +28,38 @@ function PaymentPage() {
           throw new Error('未找到用户令牌，请重新登录。');
         }
 
-        const response = await axios.post(
-          'http://localhost:5000/api/payment/generate',
-          { orderId },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        let response;
+        if (location.pathname === '/payment/batch') {
+          setIsBatchPayment(true);
+          const { orderIds, totalAmount } = location.state;
+          setOrderIds(orderIds);
+          setAmount(totalAmount);
+          response = await axios.post(
+            'http://localhost:5000/api/payment/generate-batch',
+            { orderIds, totalAmount },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+        } else {
+          response = await axios.post(
+            'http://localhost:5000/api/payment/generate',
+            { orderId },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+        }
 
         if (response.data && response.data.payUrl) {
           setPaymentLink(response.data.payUrl);
-          setAmount(response.data.amount);
+          if (!isBatchPayment) {
+            setAmount(response.data.amount);
+          }
         } else {
           alert('无法生成支付链接，请稍后重试。');
           setError('无法生成支付链接，请稍后重试。');
@@ -52,7 +74,7 @@ function PaymentPage() {
     };
 
     initiatePayment();
-  }, [orderId, navigate]);
+  }, [orderId, navigate, location]);
 
   const handleCancel = async () => {
     setShowCancelConfirm(true);
@@ -68,13 +90,24 @@ function PaymentPage() {
         return;
       }
 
-      await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      alert('订单已取消');
+      if (isBatchPayment) {
+        await Promise.all(orderIds.map(id => 
+          axios.delete(`http://localhost:5000/api/orders/${id}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        ));
+        alert('批量订单已取消');
+      } else {
+        await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        alert('订单已取消');
+      }
+      
       navigate('/customer');
     } catch (error) {
       console.error('Error deleting order:', error);
@@ -152,7 +185,16 @@ function PaymentPage() {
               <div style={styles.instructionContainer}>
                 <FaInfoCircle style={styles.icon} />
                 <p style={styles.instruction}>
-                  请务必在支付时备注订单号：{orderId}
+                  {isBatchPayment ? (
+                    <>
+                      <FaList style={{...styles.icon, marginRight: '5px'}} />
+                      批量支付 {orderIds.length} 个订单
+                      <br />
+                      订单号: {orderIds.join(', ')}
+                    </>
+                  ) : (
+                    <>请务必在支付时备注订单号：{orderId}</>
+                  )}
                   <br />
                   支付完成后请耐心等待订单确认...
                 </p>
@@ -202,7 +244,7 @@ function PaymentPage() {
             animate={{ scale: 1 }}
           >
             <h3>确认取消订单？</h3>
-            <p>您确定要取消此订单吗？此操作无法撤销。</p>
+            <p>您确定要取消{isBatchPayment ? '这些' : '此'}订单吗？此操作无法撤销。</p>
             <div style={styles.confirmButtons}>
               <motion.button
                 onClick={confirmCancel}
@@ -357,8 +399,8 @@ const styles = {
     zIndex: 1000,
   },
   successAnimation: {
-    width: '300px',
-    height: '300px',
+    width: '600px',
+    height: '600px',
   },
   '@keyframes fadeIn': {
     '0%': {
