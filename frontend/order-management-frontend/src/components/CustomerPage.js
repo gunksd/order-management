@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
-import { FaUtensils, FaShoppingCart, FaHistory, FaChartBar, FaTrash } from 'react-icons/fa';
+import { FaUtensils, FaShoppingCart, FaHistory, FaChartBar, FaTrash, FaSort } from 'react-icons/fa';
 import { IoMdPricetag } from 'react-icons/io';
 import Particles from "react-tsparticles";
 import { loadFull } from "tsparticles";
@@ -102,17 +102,21 @@ const styles = {
     transition: 'all 0.3s ease',
     outline: 'none',
     margin: '5px',
+    fontSize: '14px',
+    width: '120px',
   },
   cancelButton: {
     backgroundColor: '#c0392b',
     color: '#fff',
     border: 'none',
-    padding: '8px 16px',
+    padding: '10px 20px',
     borderRadius: '5px',
     cursor: 'pointer',
     marginTop: '10px',
     marginLeft: '10px',
     transition: 'all 0.3s ease',
+    fontSize: '14px',
+    width: '120px',
   },
   orderItem: {
     display: 'flex',
@@ -145,8 +149,8 @@ const styles = {
   },
   recommendedSection: {
     marginTop: '20px',
-    marginBottom: '40px',
-    padding: '20px',
+    marginBottom: '20px',
+    padding: '10px',
     backgroundColor: '#f8f9fa',
     borderRadius: '8px',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
@@ -161,20 +165,24 @@ const styles = {
     backgroundColor: '#ffffff',
     border: '1px solid #e0e0e0',
     borderRadius: '8px',
-    padding: '15px',
+    padding: '10px',
     transition: 'all 0.3s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
   },
   recommendedDishName: {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 'bold',
-    marginBottom: '10px',
+    marginBottom: '5px',
   },
   recommendedPriceTag: {
     display: 'flex',
     alignItems: 'center',
     color: '#e74c3c',
     fontWeight: 'bold',
-    marginBottom: '10px',
+    marginBottom: '5px',
+    fontSize: '14px',
   },
   recommendedButton: {
     backgroundColor: '#3498db',
@@ -198,6 +206,26 @@ const styles = {
     top: '20px',
     right: '20px',
   },
+  sortButton: {
+    backgroundColor: '#000000',
+    color: '#ffffff',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    outline: 'none',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 'auto',
+    marginBottom: '20px',
+  },
+  sortIcon: {
+    marginLeft: '10px',
+    color: '#ffffff',
+  },
 };
 
 function CustomerPage({ onLogout }) {
@@ -210,6 +238,27 @@ function CustomerPage({ onLogout }) {
   const [orderSummary, setOrderSummary] = useState([]);
   const [recommendedDishes, setRecommendedDishes] = useState([]);
   const navigate = useNavigate();
+
+  const updateRecommendedDishes = useCallback((addedDish) => {
+    console.log(`Updating recommended dishes based on: ${JSON.stringify(addedDish)}`);
+    if (order.length === 0) {
+      const priceLowerBound = addedDish.price * 0.9;
+      const priceUpperBound = addedDish.price * 1.1;
+      
+      const recommended = dishes
+        .filter(dish => 
+          dish.dish_id !== addedDish.dish_id &&
+          dish.price >= priceLowerBound &&
+          dish.price <= priceUpperBound &&
+          !order.some(orderItem => orderItem.dish_id === dish.dish_id)
+        )
+        .slice(0, 3);
+
+      console.log('Recommended dishes:', recommended);
+      setRecommendedDishes(recommended);
+    }
+  }, [dishes, order]);
+
 
   const username = localStorage.getItem('username');
   const userId = localStorage.getItem('userId');
@@ -319,7 +368,11 @@ function CustomerPage({ onLogout }) {
         if (existingItem) {
           if (newQuantity === 0) {
             console.log(`Removing dish ${dishId} from order`);
-            return prevOrder.filter(item => item.dish_id !== dishId);
+            const newOrder = prevOrder.filter(item => item.dish_id !== dishId);
+            if (newOrder.length === 0) {
+              setRecommendedDishes([]);
+            }
+            return newOrder;
           }
           console.log(`Updating quantity for dish ${dishId} to ${newQuantity}`);
           return prevOrder.map(item =>
@@ -354,10 +407,13 @@ function CustomerPage({ onLogout }) {
         return prevOrder;
       } else {
         console.log(`Adding new dish ${dish.dish_id} to order`);
-        return [...prevOrder, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1, maxQuantity: dish.stock }];
+        const newOrder = [...prevOrder, { dish_id: dish.dish_id, dish_name: dish.dish_name, price: dish.price, quantity: 1, maxQuantity: dish.stock }];
+        if (newOrder.length === 1) {
+          updateRecommendedDishes(dish);
+        }
+        return newOrder;
       }
     });
-    updateRecommendedDishes(dish);
   };
 
   const removeFromOrder = (dishId) => {
@@ -454,20 +510,6 @@ function CustomerPage({ onLogout }) {
     }
   };
 
-  const updateRecommendedDishes = (addedDish) => {
-    console.log(`Updating recommended dishes based on: ${JSON.stringify(addedDish)}`);
-    const priceLowerBound = addedDish.price * 0.9;
-    const priceUpperBound = addedDish.price * 1.1;
-    
-    const recommended = dishes.filter(dish => 
-      dish.dish_id !== addedDish.dish_id &&
-      dish.price >= priceLowerBound &&
-      dish.price <= priceUpperBound
-    ).slice(0, 3);
-
-    console.log('Recommended dishes:', recommended);
-    setRecommendedDishes(recommended);
-  };
 
   const particlesInit = useCallback(async (engine) => {
     await loadFull(engine);
@@ -586,12 +628,13 @@ function CustomerPage({ onLogout }) {
           <motion.button
             type="button"
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            style={styles.button}
+            style={styles.sortButton}
             variants={buttonVariants}
             whileHover="hover"
             whileTap="tap"
           >
-            {sortOrder === 'asc' ? '按价格降序排序' : '按价格升序排序'}
+            {sortOrder === 'asc' ? '按价格升序排序' : '按价格降序排序'}
+            <FaSort style={styles.sortIcon} />
           </motion.button>
           <motion.div 
             style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}
@@ -676,7 +719,7 @@ function CustomerPage({ onLogout }) {
           </h2>
           {recommendedDishes.length > 0 ? (
             <motion.div 
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}
               variants={itemVariants}
             >
               <AnimatePresence>
@@ -690,16 +733,18 @@ function CustomerPage({ onLogout }) {
                     exit="hidden"
                     layout
                   >
-                    <h3 style={styles.recommendedDishName}>{dish.dish_name}</h3>
-                    <p style={styles.recommendedPriceTag}>
-                      <IoMdPricetag style={styles.icon} />
-                      价格: ¥{dish.price}
-                    </p>
-                    <p>库存: {dish.stock}</p>
+                    <div>
+                      <h3 style={styles.recommendedDishName}>{dish.dish_name}</h3>
+                      <p style={styles.recommendedPriceTag}>
+                        <IoMdPricetag style={{...styles.icon, marginRight: '5px'}} />
+                        ¥{dish.price}
+                      </p>
+                      <p style={{fontSize: '12px', marginBottom: '5px'}}>库存: {dish.stock}</p>
+                    </div>
                     <motion.button
                       type="button"
                       onClick={() => addToOrder(dish)}
-                      style={styles.recommendedButton}
+                      style={{...styles.recommendedButton, fontSize: '12px', padding: '5px 10px'}}
                       variants={buttonVariants}
                       whileHover="hover"
                       whileTap="tap"

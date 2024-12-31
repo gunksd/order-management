@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaEye, FaEyeSlash, FaUser, FaLock } from 'react-icons/fa';
@@ -12,6 +12,15 @@ function Login({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (username) {
+      document.querySelector('input[type="text"]').parentNode.classList.add('focused');
+    }
+    if (password) {
+      document.querySelector('input[type="password"]').parentNode.classList.add('focused');
+    }
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -65,26 +74,31 @@ function Login({ onLogin }) {
           <FaUser style={styles.icon} />
           <input
             type="text"
-            placeholder="用户名"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            style={styles.input}
+            style={{...styles.input, ...(username ? styles.inputFocus : {})}}
+            onFocus={(e) => e.target.parentNode.classList.add('focused')}
+            onBlur={(e) => !e.target.value && e.target.parentNode.classList.remove('focused')}
             onKeyDown={handleKeyDown}
           />
+          <label style={{...styles.inputLabel, ...(username ? styles.inputLabelActive : {})}}>用户名</label>
         </div>
         <div style={styles.inputContainer}>
           <FaLock style={styles.icon} />
           <input
             type={showPassword ? 'text' : 'password'}
-            placeholder="密码"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={{
               ...styles.input,
+              ...(password ? styles.inputFocus : {}),
               letterSpacing: showPassword ? 'normal' : '0.1em',
             }}
+            onFocus={(e) => e.target.parentNode.classList.add('focused')}
+            onBlur={(e) => !e.target.value && e.target.parentNode.classList.remove('focused')}
             onKeyDown={handleKeyDown}
           />
+          <label style={{...styles.inputLabel, ...(password ? styles.inputLabelActive : {})}}>密码</label>
           <div
             onClick={() => setShowPassword(!showPassword)}
             style={styles.showPasswordButton}
@@ -159,6 +173,7 @@ const styles = {
   inputContainer: {
     position: 'relative',
     marginBottom: '20px',
+    transition: 'all 0.3s ease',
   },
   icon: {
     position: 'absolute',
@@ -178,7 +193,32 @@ const styles = {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     color: '#fff',
     transition: 'all 0.3s ease',
-    letterSpacing: '0.1em',
+    letterSpacing: '0.05em',
+    outline: 'none',
+    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+  },
+  inputFocus: {
+    border: '1px solid rgba(255, 255, 255, 0.5)',
+    boxShadow: '0 0 5px rgba(255, 255, 255, 0.2)',
+  },
+  inputLabel: {
+    position: 'absolute',
+    left: '40px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: '14px',
+    pointerEvents: 'none',
+    transition: 'all 0.3s ease',
+  },
+  inputLabelActive: {
+    top: '-10px',
+    left: '20px',
+    fontSize: '12px',
+    color: '#4CAF50',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: '0 5px',
+    borderRadius: '10px',
   },
   showPasswordButton: {
     position: 'absolute',
