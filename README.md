@@ -180,34 +180,9 @@ URL填写你服务器端口的url，例如本地就是http://localhost:5000
 mode可以不管他，是为了区分处于哪一种环境下的。
 
 2.下载模块：</br>
-(1).需要下载react的`react-router-dom`路由库来实现页面的跳转导航
 ```bash
 cd frontend/order-management-frontend
-npm install react-router-dom
-```
-或者
-```bash
-yarn add react-router-dom
-```
-(2).安装`axios` HTTP 客户端库:</br>
-```bash
-npm install axios
-```
-或者
-```bash
-yarn add axios
-```
-(3).安装`react-icons`图标集合库:</br>
-```bash
-npm install react-icons
-```
-或者
-```bash
-yarn add react-icons
-```
-(4).安装`react-confetti`库:</br>
-```bash
-npm install react-confetti
+npm install 
 ```
 3.启动前端服务：
 ```bash
