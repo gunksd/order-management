@@ -70,3 +70,26 @@ cd frontend/order-management-frontend
 npm start
 ```
 4.此时前端应该能正常运行，可以在浏览器端口中查看并且与后端和数据库进行交互了。
+
+### 6.最终成品展示：
+(1).登录页：
+![login page](./frontend/order-management-frontend/public/登录页面.png)
+(2).注册页面：
+![register page](./frontend/order-management-frontend/public/注册页面.png)
+(3).管理员页面：
+![admin page](./frontend/order-management-frontend/public/管理员页面1.png)
+![admin page](./frontend/order-management-frontend/public/管理员页面2.png)
+![admin page](./frontend/order-management-frontend/public/管理员页面3.png)
+(4).添加菜品：
+![dish card](./frontend/order-management-frontend/public/添加菜品.png)
+(5).添加菜品成功：
+![success](./frontend/order-management-frontend/public/成功动画.png)
+(6).顾客页面：
+![customer page](./frontend/order-management-frontend/public/顾客页面1.png)
+![customer page](./frontend/order-management-frontend/public/顾客页面2.png)
+(7).批量：
+![sum](./frontend/order-management-frontend/public/批量1.png)
+![sum](./frontend/order-management-frontend/public/批量2.png)
+(8).支付页面：
+![pay](./frontend/order-management-frontend/public/支付页面.png)
+![pay sum](./frontend/order-management-frontend/public/批量支付.png)
