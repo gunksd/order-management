@@ -90,6 +90,3 @@ npm start
 (7).批量：
 ![sum](./frontend/order-management-frontend/public/批量1.png)
 ![sum](./frontend/order-management-frontend/public/批量2.png)
-(8).支付页面：
-![pay](./frontend/order-management-frontend/public/支付页面.png)
-![pay sum](./frontend/order-management-frontend/public/批量支付.png)
